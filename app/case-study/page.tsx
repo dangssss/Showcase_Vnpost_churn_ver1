@@ -154,7 +154,7 @@ export default function CaseStudy() {
             <div className="case-section-number">06 / OUTPUT &amp; ACTION</div>
             <h2>Explanations use observed evidence,<br /><em>not generic AI summaries.</em></h2>
             <p className="case-lede">Each exported profile contains identity and time fields, recent behavior, probability and up to three reasons. A reason carries a stable code plus the customer’s current metric, comparison baseline, delta, percentage change and severity.</p>
-            <div className="reason-catalog">{reasons.map(([code, label], index) => <div key={code}><i>{String(index + 1).padStart(2, "0")}</i><code>{code}</code><p>{label}</p></div>)}</div>
+            <div className="reason-catalog">{reasons.map(([code, label], index) => <div key={code}><i>{String(index + 1).padStart(2, "0")}</i><strong>{label}</strong><span>System code · <code>{code}</code></span></div>)}</div>
             <div className="action-boundary-case">
               <div><span>CURRENT SYSTEM OUTPUT</span><strong>Risk profile CSV</strong><p>Probability, prediction period, recent metrics and three structured reasons.</p></div>
               <i>→</i>

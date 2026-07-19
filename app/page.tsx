@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 const publicBasePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
@@ -180,6 +181,69 @@ const customers: Customer[] = [
   },
 ];
 
+const reasonBusinessLabels: Record<string, string> = {
+  item_drop: "Shipment volume drop",
+  complaint_increase: "Complaint escalation",
+  delay_rate_increase: "Late-delivery increase",
+  nodone_rate_increase: "Non-completed delivery increase",
+  volume_volatility: "Unstable shipment volume",
+  order_value_drop: "Average order value decline",
+  service_diversity_drop: "Service portfolio contraction",
+  low_tenure: "New / low-tenure customer",
+};
+
+const featureBusinessLabels: Record<string, string> = {
+  item_last: "Current shipment volume",
+  revenue_last: "Recent customer revenue",
+  complaint_last: "Complaint count",
+  delay_last: "Late-delivery rate",
+  nodone_last: "Non-completed delivery rate",
+  service_types: "Active service types",
+};
+
+const actionStages = [
+  {
+    label: "Queued",
+    short: "Profile enters the review queue",
+    status: "queued",
+    eventField: "queued_at",
+    eventTime: "03 Jun · 08:00",
+    description: "The scored profile is visible to the intervention team. It is prioritized, but no reviewer or account owner has accepted it yet.",
+  },
+  {
+    label: "Context reviewed",
+    short: "Operational evidence is validated",
+    status: "context_reviewed",
+    eventField: "reviewed_at",
+    eventTime: "03 Jun · 09:15",
+    description: "A reviewer checks complaints, delivery quality and commercial context to confirm that outreach is appropriate.",
+  },
+  {
+    label: "Assigned",
+    short: "Case is handed to an owner",
+    status: "assigned",
+    eventField: "assigned_at",
+    eventTime: "03 Jun · 09:40",
+    description: "The case is assigned to the suggested team. Ownership and the recommended route become part of the handoff record.",
+  },
+  {
+    label: "Contacted",
+    short: "Customer outreach is recorded",
+    status: "contacted",
+    eventField: "contacted_at",
+    eventTime: "04 Jun · 10:30",
+    description: "A real CRM would record the outreach channel and contact time. This portfolio demo only previews that state change.",
+  },
+  {
+    label: "Outcome logged",
+    short: "Intervention result is captured",
+    status: "outcome_logged",
+    eventField: "outcome",
+    eventTime: "05 Jun · 16:20",
+    description: "The immediate outcome is stored so retention can later be measured after the two-month prediction horizon.",
+  },
+];
+
 const sourceSystems = [
   ["01", "Monthly orders", "bccp_orderitem_YYMM", "Partitioned by reporting month"],
   ["02", "Customer master", "cas_customer", "Continuously refreshed snapshot"],
@@ -213,12 +277,12 @@ const runStages = [
 type SignalMetric = keyof Customer["monthlySignals"];
 
 const signalOptions: { key: SignalMetric; label: string; unit: string }[] = [
-  { key: "shipments", label: "Shipments", unit: "items" },
+  { key: "shipments", label: "Parcel volume", unit: "items" },
   { key: "complaints", label: "Complaints", unit: "cases" },
-  { key: "lateRate", label: "Late rate", unit: "%" },
-  { key: "nonCompletedRate", label: "Not completed", unit: "%" },
-  { key: "avgValue", label: "Avg. value", unit: "₫000 / item" },
-  { key: "serviceTypes", label: "Service types", unit: "types" },
+  { key: "lateRate", label: "Late-delivery rate", unit: "%" },
+  { key: "nonCompletedRate", label: "Non-completed rate", unit: "%" },
+  { key: "avgValue", label: "Avg. order value", unit: "₫000 / item" },
+  { key: "serviceTypes", label: "Service mix", unit: "types" },
 ];
 
 const monitoringMonths = [
@@ -321,6 +385,10 @@ export default function Home() {
   const selectedSignalMax = Math.max(...selectedSignal, 1);
   const selectedSignalMeta = signalOptions.find((option) => option.key === signalMetric) ?? signalOptions[0];
   const selectedAction = actionPlan(selected);
+  const currentActionStage = actionStages[actionStep];
+  const currentActionOwner = actionStep >= 2
+    ? selectedAction.owner
+    : actionStep === 1 ? "Operations reviewer" : "Unassigned";
   const monitoringSeries = monitoringMonths.map((month, index) => (
     index === monitoringMonths.length - 1
       ? { ...month, riskRatio: Math.round(riskFlagCount / demoPopulationScores.length * 100) }
@@ -390,6 +458,27 @@ export default function Home() {
         <p>All customer records shown here are synthetic. Production performance and verified business impact are intentionally reserved for a validated update.</p>
         <span>NO PRODUCTION DATA</span>
       </aside>
+
+      <section className="domain-scene" aria-labelledby="domain-scene-title">
+        <Image
+          src={`${publicBasePath}/logistics-network.png`}
+          alt="Illustrated parcel sorting hub connected to a regional last-mile delivery network"
+          width={1710}
+          height={920}
+          sizes="100vw"
+        />
+        <div className="domain-scene-card">
+          <span>LOGISTICS OPERATING CONTEXT</span>
+          <h2 id="domain-scene-title">Churn signals begin<br />inside the parcel flow.</h2>
+          <p>Before a customer leaves, the network often sees changing shipment volume, service quality and product usage. The model turns those operational patterns into a reviewable customer queue.</p>
+          <div className="domain-signal-grid">
+            <div><i>01</i><strong>Parcel flow</strong><small>Shipment volume, revenue and volatility</small></div>
+            <div><i>02</i><strong>Delivery quality</strong><small>Late, failed and complaint behavior</small></div>
+            <div><i>03</i><strong>Relationship depth</strong><small>Tenure and active service mix</small></div>
+          </div>
+        </div>
+        <div className="domain-route-caption"><span>Sorting hub</span><i>→</i><span>Last-mile network</span><i>→</i><span>Customer behavior</span><i>→</i><strong>Retention decision</strong></div>
+      </section>
 
       <section className="section problem" id="problem">
         <div className="section-label">01 / Business &amp; data</div>
@@ -490,20 +579,20 @@ export default function Home() {
               <div className="control-block policy-control">
                 <label>Operating decision mode</label>
                 <div className="segmented">
-                  <button className={policy === "probability" ? "active" : ""} onClick={() => setPolicy("probability")}>Probability</button>
-                  <button className={policy === "percentile" ? "active" : ""} onClick={() => setPolicy("percentile")}>Score percentile</button>
+                  <button className={policy === "probability" ? "active" : ""} onClick={() => { setPolicy("probability"); setActionStep(0); }}>Probability</button>
+                  <button className={policy === "percentile" ? "active" : ""} onClick={() => { setPolicy("percentile"); setActionStep(0); }}>Score percentile</button>
                 </div>
               </div>
               {policy === "probability" ? (
                 <div className="control-block range-block">
                   <label htmlFor="threshold">Flag when probability ≥ <strong>{threshold}%</strong></label>
-                  <input id="threshold" type="range" min="30" max="80" value={threshold} onChange={(event) => setThreshold(Number(event.target.value))} />
+                  <input id="threshold" type="range" min="30" max="80" value={threshold} onChange={(event) => { setThreshold(Number(event.target.value)); setActionStep(0); }} />
                   <div><span>30%</span><span>80%</span></div>
                 </div>
               ) : (
                 <div className="control-block range-block">
                   <label htmlFor="percentile">Keep customers at or above <strong>P{percentile}</strong></label>
-                  <input id="percentile" type="range" min="60" max="95" step="5" value={percentile} onChange={(event) => setPercentile(Number(event.target.value))} />
+                  <input id="percentile" type="range" min="60" max="95" step="5" value={percentile} onChange={(event) => { setPercentile(Number(event.target.value)); setActionStep(0); }} />
                   <div><span>P60</span><span>P95</span></div>
                 </div>
               )}
@@ -540,7 +629,7 @@ export default function Home() {
           <div className="queue-toolbar">
             <div><span>INTERVENTION WORKSPACE</span><h3>Inspect the ranked queue and customer dossier</h3></div>
             <label>Region
-              <select value={regionFilter} onChange={(event) => setRegionFilter(event.target.value as "All" | "North" | "Central" | "South")}>
+              <select value={regionFilter} onChange={(event) => { setRegionFilter(event.target.value as "All" | "North" | "Central" | "South"); setActionStep(0); }}>
                 <option>All</option><option>North</option><option>Central</option><option>South</option>
               </select>
             </label>
@@ -553,7 +642,7 @@ export default function Home() {
               <div className="table-header"><span>Rank / account</span><span>6M activity</span><span>Revenue</span><span>Probability</span></div>
               <div className="table-body">
                 {visibleCustomers.map((customer, index) => (
-                  <button className={`customer-row ${selected.id === customer.id ? "selected" : ""}`} key={customer.id} onClick={() => setSelectedId(customer.id)}>
+                  <button className={`customer-row ${selected.id === customer.id ? "selected" : ""}`} key={customer.id} onClick={() => { setSelectedId(customer.id); setActionStep(0); }}>
                     <span className="customer-main"><i>{String(index + 1).padStart(2, "0")}</i><span><strong>{customer.id}</strong><small>{customer.segment} · {customer.region}</small></span></span>
                     <Bars values={customer.trend} />
                     <span className="revenue">{customer.revenue}</span>
@@ -586,7 +675,10 @@ export default function Home() {
                   <li key={reason.code}>
                     <span>0{index + 1}</span>
                     <div className="reason-content">
-                      <div className="reason-meta"><code>{reason.code}</code><em className={reason.severity.toLowerCase()}>{reason.severity}</em></div>
+                      <div className="reason-meta">
+                        <div><strong className="reason-business-label">{reasonBusinessLabels[reason.code] ?? reason.code}</strong><span className="reason-code">System code · <code>{reason.code}</code></span></div>
+                        <em className={reason.severity.toLowerCase()}>{reason.severity}</em>
+                      </div>
                       <strong className="reason-text">{reason.text}</strong>
                       <div className="reason-evidence"><span><small>Current metric</small><b>{reason.metric}</b></span><span><small>3M baseline</small><b>{reason.baseline}</b></span><span><small>Change</small><b>{reason.delta}</b></span></div>
                     </div>
@@ -597,7 +689,7 @@ export default function Home() {
             </aside>
           </div>
 
-          <div className="action-workspace">
+          <div className="action-workspace" id="action-workflow">
             <div className="action-heading">
               <div><span>TAKE ACTION</span><h3>Convert one risk profile into a controlled intervention</h3><p>The recommendation changes with the selected account’s reason codes; the workflow below is a portfolio integration layer, not an automated decision.</p></div>
               <span className="human-chip">Human review required</span>
@@ -618,11 +710,22 @@ export default function Home() {
                 <span>DEMO WORKFLOW</span>
                 <h4>Record the handoff, not just the prediction</h4>
                 <div className="action-steps">
-                  {["Queued", "Context reviewed", "Assigned", "Contacted", "Outcome logged"].map((step, index) => (
-                    <button key={step} className={index <= actionStep ? "complete" : ""} onClick={() => setActionStep(index)}><i>{String(index + 1).padStart(2, "0")}</i><span>{step}</span></button>
+                  {actionStages.map((step, index) => (
+                    <button key={step.status} className={`${index <= actionStep ? "complete" : ""} ${index === actionStep ? "current" : ""}`} onClick={() => setActionStep(index)} aria-current={index === actionStep ? "step" : undefined}><i>{String(index + 1).padStart(2, "0")}</i><span><strong>{step.label}</strong><small>{step.short}</small></span></button>
                   ))}
                 </div>
-                <p>Click a stage to simulate status. This UI does not write to a CRM or contact a customer.</p>
+                <div className="workflow-status-card" aria-live="polite">
+                  <div><span>CURRENT SIMULATED STATE</span><em>Demo only</em></div>
+                  <strong>{currentActionStage.label}</strong>
+                  <p>{currentActionStage.description}</p>
+                  <div className="workflow-status-grid">
+                    <span><small>Current owner</small><b>{currentActionOwner}</b></span>
+                    <span><small>CRM field updated</small><code>{currentActionStage.eventField}</code></span>
+                    <span><small>Demo event</small><b>{currentActionStage.eventTime}</b></span>
+                  </div>
+                  <div className="workflow-record-preview"><small>action_status</small><code>{currentActionStage.status}</code></div>
+                </div>
+                <p>Choose a checkpoint to update the state card and CRM preview. No customer is contacted and no external system is changed.</p>
               </section>
               <section className="output-boundary">
                 <span>OUTPUT BOUNDARY</span>
@@ -700,7 +803,7 @@ export default function Home() {
               {featureDrift.map((feature) => {
                 const value = feature.values[monitoringMonth];
                 const state = psiStatus(value);
-                return <div key={feature.name}><code>{feature.name}</code><b>{value.toFixed(2)}</b><em className={state.toLowerCase()}>{state}</em></div>;
+                return <div key={feature.name}><span className="feature-name"><strong>{featureBusinessLabels[feature.name] ?? feature.name}</strong><code>{feature.name}</code></span><b>{value.toFixed(2)}</b><em className={state.toLowerCase()}>{state}</em></div>;
               })}
             </div>
             <div className="drift-legend"><span><i className="ok" />OK ≤ 0.10</span><span><i className="warn" />WARN &gt; 0.10</span><span><i className="alert" />ALERT &gt; 0.20</span></div>
