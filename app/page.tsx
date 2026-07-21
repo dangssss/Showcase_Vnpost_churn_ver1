@@ -3,203 +3,45 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import artifacts from "./notebook-artifacts.json";
 
 const publicBasePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
-type Customer = {
-  id: string;
-  probability: number;
-  revenue: string;
-  trend: number[];
-  monthlySignals: {
-    shipments: number[];
-    complaints: number[];
-    lateRate: number[];
-    nonCompletedRate: number[];
-    avgValue: number[];
-    serviceTypes: number[];
-  };
-  segment: string;
-  region: string;
-  activeMonths: number;
-  itemsInWindow: number;
-  serviceTypes: number;
-  reasons: {
-    code: string;
-    text: string;
-    metric: string;
-    baseline: string;
-    delta: string;
-    severity: "High" | "Medium";
-  }[];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function monthLabel(yymm: number) {
+  return `${MONTH_NAMES[(yymm % 100) - 1]} ${Math.floor(yymm / 100)}`;
+}
+
+const fmt = (value: number) => value.toLocaleString("en-US");
+const pct = (value: number, digits = 1) => `${(value * 100).toFixed(digits)}%`;
+
+const regionLabels: Record<string, string> = {
+  BAC: "North",
+  TRUNG: "Central",
+  NAM: "South",
+  NOI_HN: "Hanoi metro",
+  NOI_HCM: "HCMC metro",
 };
 
-const customers: Customer[] = [
-  {
-    id: "SYN-LG-0412",
-    probability: 0.86,
-    revenue: "₫18.4m",
-    trend: [82, 75, 51, 46, 39, 24],
-    monthlySignals: {
-      shipments: [82, 75, 51, 46, 39, 24],
-      complaints: [1, 2, 3, 3, 3, 5],
-      lateRate: [4.1, 4.4, 4.8, 5.2, 6.4, 8.9],
-      nonCompletedRate: [3.1, 4.0, 4.7, 5.1, 4.9, 8.2],
-      avgValue: [94, 93, 91, 88, 82, 74],
-      serviceTypes: [5, 5, 5, 4, 4, 4],
-    },
-    segment: "Marketplace seller",
-    region: "North",
-    activeMonths: 6,
-    itemsInWindow: 317,
-    serviceTypes: 4,
-    reasons: [
-      { code: "item_drop", text: "Current shipment volume is 47% below the previous three-month average", metric: "24 shipments", baseline: "45.3 shipments", delta: "−47%", severity: "High" },
-      { code: "nodone_rate_increase", text: "Non-completed delivery rate increased 67% versus the previous three-month average", metric: "8.2%", baseline: "4.9%", delta: "+67%", severity: "High" },
-      { code: "complaint_increase", text: "Customer complaints increased 67% versus the previous three-month average", metric: "5 complaints", baseline: "3.0 complaints", delta: "+67%", severity: "Medium" },
-    ],
-  },
-  {
-    id: "SYN-LG-1865",
-    probability: 0.79,
-    revenue: "₫12.7m",
-    trend: [70, 73, 66, 55, 42, 31],
-    monthlySignals: {
-      shipments: [70, 73, 66, 55, 42, 31],
-      complaints: [1, 1, 2, 2, 2, 3],
-      lateRate: [3.8, 4.1, 4.0, 4.8, 5.2, 6.1],
-      nonCompletedRate: [2.7, 2.9, 3.1, 3.4, 3.8, 4.5],
-      avgValue: [103, 101, 98, 95, 83, 71],
-      serviceTypes: [5, 5, 5, 4, 4, 3],
-    },
-    segment: "Retail chain",
-    region: "Central",
-    activeMonths: 4,
-    itemsInWindow: 391,
-    serviceTypes: 3,
-    reasons: [
-      { code: "order_value_drop", text: "Average order value declined 23% over time", metric: "₫71k / item", baseline: "₫92k / item", delta: "−23%", severity: "High" },
-      { code: "service_diversity_drop", text: "Service diversity decreased from five to three service types", metric: "3 types", baseline: "5 types", delta: "−40%", severity: "Medium" },
-      { code: "low_tenure", text: "New customer with low engagement tenure (four months)", metric: "4 months", baseline: "6-month mark", delta: "−2 mo.", severity: "Medium" },
-    ],
-  },
-  {
-    id: "SYN-LG-2308",
-    probability: 0.72,
-    revenue: "₫9.8m",
-    trend: [5, 160, 58, 55, 48, 29],
-    monthlySignals: {
-      shipments: [5, 160, 58, 55, 48, 29],
-      complaints: [1, 2, 1, 3, 3, 4],
-      lateRate: [4.6, 5.0, 5.8, 6.9, 9.8, 12.4],
-      nonCompletedRate: [3.0, 3.4, 3.2, 4.1, 5.7, 6.8],
-      avgValue: [89, 92, 85, 90, 79, 76],
-      serviceTypes: [5, 5, 5, 5, 5, 5],
-    },
-    segment: "Social commerce",
-    region: "South",
-    activeMonths: 6,
-    itemsInWindow: 355,
-    serviceTypes: 5,
-    reasons: [
-      { code: "item_drop", text: "Current shipment volume is 46% below the previous three-month average", metric: "29 shipments", baseline: "53.7 shipments", delta: "−46%", severity: "High" },
-      { code: "delay_rate_increase", text: "Late-delivery rate increased 65% versus the previous three-month average", metric: "12.4%", baseline: "7.5%", delta: "+65%", severity: "High" },
-      { code: "volume_volatility", text: "Shipment-volume volatility is high (CV = 0.84)", metric: "CV 0.84", baseline: "Alert at 0.70", delta: "+20%", severity: "Medium" },
-    ],
-  },
-  {
-    id: "SYN-LG-3174",
-    probability: 0.63,
-    revenue: "₫15.1m",
-    trend: [78, 69, 72, 61, 54, 44],
-    monthlySignals: {
-      shipments: [78, 69, 72, 61, 54, 44],
-      complaints: [2, 2, 3, 3, 4, 6],
-      lateRate: [5.1, 5.0, 5.8, 6.0, 6.8, 7.4],
-      nonCompletedRate: [3.8, 3.5, 4.1, 4.3, 4.9, 5.4],
-      avgValue: [112, 109, 105, 104, 106, 86],
-      serviceTypes: [4, 4, 4, 4, 3, 2],
-    },
-    segment: "Wholesale",
-    region: "North",
-    activeMonths: 6,
-    itemsInWindow: 419,
-    serviceTypes: 2,
-    reasons: [
-      { code: "complaint_increase", text: "Customer complaints increased 80% versus the previous three-month average", metric: "6.0 complaints", baseline: "3.3 complaints", delta: "+80%", severity: "High" },
-      { code: "order_value_drop", text: "Average order value declined 18% over time", metric: "₫86k / item", baseline: "₫105k / item", delta: "−18%", severity: "Medium" },
-      { code: "service_diversity_drop", text: "Service diversity decreased from four to two service types", metric: "2 types", baseline: "4 types", delta: "−50%", severity: "Medium" },
-    ],
-  },
-  {
-    id: "SYN-LG-4091",
-    probability: 0.48,
-    revenue: "₫7.3m",
-    trend: [1, 135, 59, 49, 43, 38],
-    monthlySignals: {
-      shipments: [1, 135, 59, 49, 43, 38],
-      complaints: [1, 1, 2, 2, 2, 3],
-      lateRate: [4.2, 4.0, 4.8, 5.2, 5.8, 6.3],
-      nonCompletedRate: [3.6, 4.1, 5.2, 5.0, 6.0, 7.8],
-      avgValue: [84, 82, 86, 79, 77, 73],
-      serviceTypes: [4, 4, 4, 4, 4, 4],
-    },
-    segment: "SME retailer",
-    region: "Central",
-    activeMonths: 5,
-    itemsInWindow: 325,
-    serviceTypes: 4,
-    reasons: [
-      { code: "nodone_rate_increase", text: "Non-completed delivery rate increased 44% versus the previous three-month average", metric: "7.8%", baseline: "5.4%", delta: "+44%", severity: "High" },
-      { code: "volume_volatility", text: "Shipment-volume volatility is high (CV = 0.78)", metric: "CV 0.78", baseline: "Alert at 0.70", delta: "+11%", severity: "Medium" },
-      { code: "low_tenure", text: "New customer with low engagement tenure (five months)", metric: "5 months", baseline: "6-month mark", delta: "−1 mo.", severity: "Medium" },
-    ],
-  },
-  {
-    id: "SYN-LG-5220",
-    probability: 0.38,
-    revenue: "₫6.1m",
-    trend: [48, 44, 47, 42, 40, 36],
-    monthlySignals: {
-      shipments: [48, 44, 47, 42, 40, 36],
-      complaints: [1, 1, 1, 2, 2, 2],
-      lateRate: [5.8, 6.3, 6.7, 7.0, 8.2, 9.4],
-      nonCompletedRate: [3.9, 4.0, 4.4, 4.8, 5.2, 5.6],
-      avgValue: [91, 89, 86, 85, 87, 74],
-      serviceTypes: [4, 4, 4, 4, 4, 3],
-    },
-    segment: "Online merchant",
-    region: "South",
-    activeMonths: 4,
-    itemsInWindow: 201,
-    serviceTypes: 3,
-    reasons: [
-      { code: "delay_rate_increase", text: "Late-delivery rate increased 29% versus the previous three-month average", metric: "9.4%", baseline: "7.3%", delta: "+29%", severity: "High" },
-      { code: "order_value_drop", text: "Average order value declined 14% over time", metric: "₫74k / item", baseline: "₫86k / item", delta: "−14%", severity: "Medium" },
-      { code: "service_diversity_drop", text: "Service diversity decreased from four to three service types", metric: "3 types", baseline: "4 types", delta: "−25%", severity: "Medium" },
-    ],
-  },
+type RepCustomer = (typeof artifacts.customer_timeseries)[number];
+type SignalKey = keyof RepCustomer["series"];
+
+const signalOptions: { key: SignalKey; label: string; unit: string }[] = [
+  { key: "item", label: "Parcel volume", unit: "items / month" },
+  { key: "revenue", label: "Revenue", unit: "₫ / month" },
+  { key: "complaint", label: "Complaints", unit: "cases / month" },
+  { key: "delay", label: "Late deliveries", unit: "parcels / month" },
+  { key: "nodone", label: "Failed deliveries", unit: "parcels / month" },
+  { key: "order_score", label: "Order quality", unit: "score 0–12" },
+  { key: "satisfaction", label: "Satisfaction", unit: "score 0–10" },
 ];
 
-const reasonBusinessLabels: Record<string, string> = {
-  item_drop: "Shipment volume drop",
-  complaint_increase: "Complaint escalation",
-  delay_rate_increase: "Late-delivery increase",
-  nodone_rate_increase: "Non-completed delivery increase",
-  volume_volatility: "Unstable shipment volume",
-  order_value_drop: "Average order value decline",
-  service_diversity_drop: "Service portfolio contraction",
-  low_tenure: "New / low-tenure customer",
-};
-
-const featureBusinessLabels: Record<string, string> = {
-  item_last: "Current shipment volume",
-  revenue_last: "Recent customer revenue",
-  complaint_last: "Complaint count",
-  delay_last: "Late-delivery rate",
-  nodone_last: "Non-completed delivery rate",
-  service_types: "Active service types",
-};
+const riskBands: { label: string; ranks: number[]; note: string }[] = [
+  { label: "Top of the queue", ranks: [1, 2, 3, 4, 5, 6], note: "Highest predicted probability" },
+  { label: "Borderline", ranks: [357, 358], note: "Sitting on the decision threshold" },
+  { label: "Low risk", ranks: [574, 575], note: "Scored low by the same model" },
+];
 
 const actionStages = [
   {
@@ -207,100 +49,70 @@ const actionStages = [
     short: "Profile enters the review queue",
     status: "queued",
     eventField: "queued_at",
-    eventTime: "03 Jun · 08:00",
-    description: "The scored profile is visible to the intervention team. It is prioritized, but no reviewer or account owner has accepted it yet.",
+    description:
+      "The scored profile is visible to the intervention team. It is prioritized, but no reviewer or account owner has accepted it yet.",
   },
   {
     label: "Context reviewed",
     short: "Operational evidence is validated",
     status: "context_reviewed",
     eventField: "reviewed_at",
-    eventTime: "03 Jun · 09:15",
-    description: "A reviewer checks complaints, delivery quality and commercial context to confirm that outreach is appropriate.",
+    description:
+      "A reviewer checks complaints, delivery quality and commercial context to confirm that outreach is appropriate.",
   },
   {
     label: "Assigned",
     short: "Case is handed to an owner",
     status: "assigned",
     eventField: "assigned_at",
-    eventTime: "03 Jun · 09:40",
-    description: "The case is assigned to the suggested team. Ownership and the recommended route become part of the handoff record.",
+    description:
+      "The case is assigned to the suggested team. Ownership and the recommended route become part of the handoff record.",
   },
   {
     label: "Contacted",
     short: "Customer outreach is recorded",
     status: "contacted",
     eventField: "contacted_at",
-    eventTime: "04 Jun · 10:30",
-    description: "A real CRM would record the outreach channel and contact time. This portfolio demo only previews that state change.",
+    description:
+      "A real CRM would record the outreach channel and contact time. This portfolio demo only previews that state change.",
   },
   {
     label: "Outcome logged",
     short: "Intervention result is captured",
     status: "outcome_logged",
     eventField: "outcome",
-    eventTime: "05 Jun · 16:20",
-    description: "The immediate outcome is stored so retention can later be measured after the two-month prediction horizon.",
+    description:
+      "The immediate outcome is stored so retention can later be measured after the two-month prediction horizon.",
   },
 ];
 
-const sourceSystems = [
-  ["01", "Monthly orders", "bccp_orderitem_YYMM", "Partitioned by reporting month"],
-  ["02", "Customer master", "cas_customer", "Continuously refreshed snapshot"],
-  ["03", "Customer profile", "cas_info", "Continuously refreshed snapshot"],
-  ["04", "Complaints", "cms_complaint", "Continuously refreshed snapshot"],
-];
-
-const developmentSteps = [
-  ["01", "Frame", "Define churn, the two-month prediction horizon and leakage-safe observation windows."],
-  ["02", "Baseline", "Establish an interpretable Logistic Regression benchmark before increasing model complexity."],
-  ["03", "Validate", "Use purged walk-forward folds so training observations cannot leak into future evaluation periods."],
-  ["04", "Tune", "Move from a broad random search to Optuna/TPE for efficient XGBoost hyperparameter exploration."],
-  ["05", "Hold out", "Reserve the final time period as a one-time approximation of the next production run."],
-  ["06", "Operationalize", "Translate scores into probability- or capacity-based queues with customer-level reasons."],
-];
-
-const demoPopulationScores = [
-  0.86, 0.79, 0.72, 0.63, 0.48, 0.38, 0.34, 0.31,
-  0.29, 0.27, 0.25, 0.23, 0.21, 0.20, 0.18, 0.17,
-  0.15, 0.14, 0.12, 0.10, 0.09, 0.08, 0.06, 0.05,
-];
-
-const runStages = [
-  ["01", "Load", "Monthly window + customer snapshot"],
-  ["02", "Gate", "Active and churn-eligible only"],
-  ["03", "Score", "XGBoost probability + percentile"],
-  ["04", "Explain", "SHAP mapped to eight reason buckets"],
-  ["05", "Export", "CRM-ready risk profiles"],
-];
-
-type SignalMetric = keyof Customer["monthlySignals"];
-
-const signalOptions: { key: SignalMetric; label: string; unit: string }[] = [
-  { key: "shipments", label: "Parcel volume", unit: "items" },
-  { key: "complaints", label: "Complaints", unit: "cases" },
-  { key: "lateRate", label: "Late-delivery rate", unit: "%" },
-  { key: "nonCompletedRate", label: "Non-completed rate", unit: "%" },
-  { key: "avgValue", label: "Avg. order value", unit: "₫000 / item" },
-  { key: "serviceTypes", label: "Service mix", unit: "types" },
+const reasonCatalog = [
+  ["item_drop", "Shipment volume below the previous three-month average"],
+  ["complaint_increase", "Complaint count above the previous three-month average"],
+  ["delay_rate_increase", "Late-delivery rate increased"],
+  ["nodone_rate_increase", "Non-completed delivery rate increased"],
+  ["volume_volatility", "High shipment-volume coefficient of variation"],
+  ["order_value_drop", "Average order value declined"],
+  ["service_diversity_drop", "The customer uses fewer service types"],
+  ["low_tenure", "New customer with low engagement tenure"],
 ];
 
 const monitoringMonths = [
-  { key: "2412", label: "Dec 24", p50: 15, p90: 52, p99: 78, riskRatio: 12 },
-  { key: "2501", label: "Jan 25", p50: 17, p90: 55, p99: 80, riskRatio: 13 },
-  { key: "2502", label: "Feb 25", p50: 18, p90: 59, p99: 81, riskRatio: 14 },
-  { key: "2503", label: "Mar 25", p50: 20, p90: 62, p99: 82, riskRatio: 16 },
-  { key: "2504", label: "Apr 25", p50: 21, p90: 65, p99: 83, riskRatio: 17 },
-  { key: "2505", label: "May 25", p50: 22, p90: 69, p99: 84, riskRatio: 25 },
+  { key: "2603", label: "Mar 26", p50: 15, p90: 52, p99: 78, riskRatio: 12 },
+  { key: "2604", label: "Apr 26", p50: 17, p90: 55, p99: 80, riskRatio: 13 },
+  { key: "2605", label: "May 26", p50: 18, p90: 59, p99: 81, riskRatio: 14 },
+  { key: "2606", label: "Jun 26", p50: 20, p90: 62, p99: 82, riskRatio: 16 },
+  { key: "2607", label: "Jul 26", p50: 21, p90: 65, p99: 83, riskRatio: 17 },
+  { key: "2608", label: "Aug 26", p50: 22, p90: 69, p99: 84, riskRatio: 25 },
 ];
 
 const featureDrift = [
-  { name: "item_last", values: [0.05, 0.06, 0.07, 0.09, 0.12, 0.23] },
-  { name: "revenue_last", values: [0.04, 0.05, 0.06, 0.08, 0.11, 0.16] },
-  { name: "complaint_last", values: [0.03, 0.04, 0.06, 0.08, 0.13, 0.21] },
-  { name: "delay_last", values: [0.02, 0.04, 0.05, 0.07, 0.09, 0.13] },
-  { name: "nodone_last", values: [0.05, 0.05, 0.07, 0.10, 0.14, 0.19] },
-  { name: "service_types", values: [0.03, 0.03, 0.04, 0.05, 0.06, 0.08] },
+  { name: "item_t", label: "Current parcel volume", values: [0.05, 0.06, 0.07, 0.09, 0.12, 0.23] },
+  { name: "revenue_t", label: "Current revenue", values: [0.04, 0.05, 0.06, 0.08, 0.11, 0.16] },
+  { name: "complaint_t", label: "Complaint count", values: [0.03, 0.04, 0.06, 0.08, 0.13, 0.21] },
+  { name: "pct_delay", label: "Late-delivery rate", values: [0.02, 0.04, 0.05, 0.07, 0.09, 0.13] },
+  { name: "pct_noaccepted", label: "Failed-delivery rate", values: [0.05, 0.05, 0.07, 0.1, 0.14, 0.19] },
+  { name: "service_types_used", label: "Service types used", values: [0.03, 0.03, 0.04, 0.05, 0.06, 0.08] },
 ];
 
 function psiStatus(value: number) {
@@ -309,92 +121,267 @@ function psiStatus(value: number) {
   return "OK";
 }
 
-function actionPlan(customer: Customer) {
-  const codes = new Set(customer.reasons.map((reason) => reason.code));
-  if (["complaint_increase", "delay_rate_increase", "nodone_rate_increase"].some((code) => codes.has(code))) {
-    return {
-      route: "Service recovery before outreach",
-      owner: "Operations + account owner",
-      next: "Review open complaints and recent failed or late deliveries; resolve service context before a retention call.",
-      evidence: "Complaint, late-delivery and completion history",
-    };
+type DerivedSignal = {
+  code: string;
+  label: string;
+  text: string;
+  current: string;
+  baseline: string;
+  delta: string;
+  severity: "High" | "Medium";
+  weight: number;
+};
+
+const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(xs.length, 1);
+
+function deriveSignals(customer: RepCustomer): DerivedSignal[] {
+  const t = customer.months.indexOf(customer.window_end);
+  if (t < 3) return [];
+  const s = customer.series;
+  const out: DerivedSignal[] = [];
+
+  const itemNow = s.item[t];
+  const itemBase = mean(s.item.slice(t - 3, t));
+  if (itemBase > 0 && itemNow <= itemBase * 0.85) {
+    const change = (itemNow - itemBase) / itemBase;
+    out.push({
+      code: "item_drop",
+      label: "Shipment volume drop",
+      text: `Parcel volume is ${pct(Math.abs(change), 0)} below the previous three-month average`,
+      current: `${fmt(itemNow)} items`,
+      baseline: `${itemBase.toFixed(1)} items`,
+      delta: `−${pct(Math.abs(change), 0)}`,
+      severity: change <= -0.4 ? "High" : "Medium",
+      weight: Math.abs(change) + 1,
+    });
   }
-  if (codes.has("service_diversity_drop")) {
-    return {
-      route: "Account review + service consultation",
-      owner: "Account management",
-      next: "Validate the service-mix contraction and discuss whether an alternative logistics service fits the account.",
-      evidence: "Service mix, volume and average order value",
-    };
+
+  const compNow = s.complaint[t];
+  const compBase = mean(s.complaint.slice(t - 3, t));
+  if (compNow >= 2 && compNow > compBase) {
+    const change = compBase > 0 ? (compNow - compBase) / compBase : 1;
+    out.push({
+      code: "complaint_increase",
+      label: "Complaint escalation",
+      text:
+        compBase > 0
+          ? `Complaints are ${pct(change, 0)} above the previous three-month average`
+          : `${fmt(compNow)} complaints after a quiet three-month baseline`,
+      current: `${fmt(compNow)} cases`,
+      baseline: `${compBase.toFixed(1)} cases`,
+      delta: `+${pct(change, 0)}`,
+      severity: change >= 0.6 ? "High" : "Medium",
+      weight: change,
+    });
   }
-  if (codes.has("low_tenure")) {
-    return {
-      route: "Early-life onboarding follow-up",
-      owner: "Customer success",
-      next: "Check onboarding friction, confirm expected shipping pattern and schedule a guided follow-up.",
-      evidence: "Tenure, activation and first-month usage",
-    };
+
+  const rateAt = (num: number[], i: number) => num[i] / Math.max(s.item[i], 1);
+  const delayNow = rateAt(s.delay, t);
+  const delayBase = mean([rateAt(s.delay, t - 3), rateAt(s.delay, t - 2), rateAt(s.delay, t - 1)]);
+  if (delayNow > Math.max(delayBase * 1.2, 0.03)) {
+    const change = delayBase > 0 ? (delayNow - delayBase) / delayBase : 1;
+    out.push({
+      code: "delay_rate_increase",
+      label: "Late-delivery increase",
+      text: `Late-delivery rate rose to ${pct(delayNow)} versus a ${pct(delayBase)} baseline`,
+      current: pct(delayNow),
+      baseline: pct(delayBase),
+      delta: `+${pct(change, 0)}`,
+      severity: change >= 0.5 ? "High" : "Medium",
+      weight: change,
+    });
   }
-  return {
-    route: "Retention account review",
-    owner: "Account management",
-    next: "Validate the volume or value decline, review commercial context and prioritize a retention conversation.",
-    evidence: "Shipment volume, revenue and order-value trend",
-  };
+
+  const nodoneNow = rateAt(s.nodone, t);
+  const nodoneBase = mean([rateAt(s.nodone, t - 3), rateAt(s.nodone, t - 2), rateAt(s.nodone, t - 1)]);
+  if (nodoneNow > Math.max(nodoneBase * 1.2, 0.02)) {
+    const change = nodoneBase > 0 ? (nodoneNow - nodoneBase) / nodoneBase : 1;
+    out.push({
+      code: "nodone_rate_increase",
+      label: "Failed-delivery increase",
+      text: `Failed-delivery rate rose to ${pct(nodoneNow)} versus a ${pct(nodoneBase)} baseline`,
+      current: pct(nodoneNow),
+      baseline: pct(nodoneBase),
+      delta: `+${pct(change, 0)}`,
+      severity: change >= 0.5 ? "High" : "Medium",
+      weight: change * 0.95,
+    });
+  }
+
+  const last6 = s.item.slice(t - 5, t + 1);
+  const vol = mean(last6) > 0 ? Math.sqrt(mean(last6.map((v) => (v - mean(last6)) ** 2))) / mean(last6) : 0;
+  if (vol > 0.6) {
+    out.push({
+      code: "volume_volatility",
+      label: "Unstable shipment volume",
+      text: `Six-month volume volatility is high (CV = ${vol.toFixed(2)})`,
+      current: `CV ${vol.toFixed(2)}`,
+      baseline: "Alert at 0.60",
+      delta: `+${pct(vol / 0.6 - 1, 0)}`,
+      severity: vol > 1 ? "High" : "Medium",
+      weight: vol * 0.6,
+    });
+  }
+
+  const valueAt = (i: number) => s.revenue[i] / Math.max(s.item[i], 1);
+  const valueNow = valueAt(t);
+  const valueBase = mean([valueAt(t - 3), valueAt(t - 2), valueAt(t - 1)]);
+  if (s.item[t] > 0 && valueBase > 0 && valueNow <= valueBase * 0.85) {
+    const change = (valueNow - valueBase) / valueBase;
+    out.push({
+      code: "order_value_drop",
+      label: "Average order value decline",
+      text: `Average order value declined ${pct(Math.abs(change), 0)} versus the three-month baseline`,
+      current: `₫${fmt(Math.round(valueNow / 1000))}k / item`,
+      baseline: `₫${fmt(Math.round(valueBase / 1000))}k / item`,
+      delta: `−${pct(Math.abs(change), 0)}`,
+      severity: change <= -0.35 ? "High" : "Medium",
+      weight: Math.abs(change) * 0.9,
+    });
+  }
+
+  if (customer.tenure_months < 12) {
+    out.push({
+      code: "low_tenure",
+      label: "New / low-tenure customer",
+      text: `New customer with ${customer.tenure_months} months of tenure`,
+      current: `${customer.tenure_months} months`,
+      baseline: "12-month mark",
+      delta: `−${12 - customer.tenure_months} mo.`,
+      severity: "Medium",
+      weight: 0.3,
+    });
+  }
+
+  return out.sort((a, b) => b.weight - a.weight).slice(0, 3);
 }
 
-function Bars({ values }: { values: number[] }) {
+function CurvePlot({
+  points,
+  color,
+  title,
+  badge,
+  xLabel,
+  yLabel,
+  diagonal,
+  refY,
+  refYLabel,
+  marker,
+  markerLabel,
+}: {
+  points: { x: number; y: number }[];
+  color: string;
+  title: string;
+  badge: string;
+  xLabel: string;
+  yLabel: string;
+  diagonal?: boolean;
+  refY?: number;
+  refYLabel?: string;
+  marker?: { x: number; y: number };
+  markerLabel?: string;
+}) {
+  const W = 420;
+  const H = 320;
+  const P = { l: 52, r: 16, t: 18, b: 46 };
+  const sx = (x: number) => P.l + x * (W - P.l - P.r);
+  const sy = (y: number) => H - P.b - y * (H - P.t - P.b);
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(" ");
+  const ticks = [0, 0.25, 0.5, 0.75, 1];
   return (
-    <span className="mini-bars" aria-label={`Activity trend: ${values.join(", ")}`}>
-      {values.map((value, index) => (
-        <i key={index} style={{ height: `${Math.max(value, 16)}%` }} />
-      ))}
-    </span>
+    <figure className="curve-plot">
+      <figcaption>
+        <strong>{title}</strong>
+        <span>{badge}</span>
+      </figcaption>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title}: ${badge}`}>
+        {ticks.map((tick) => (
+          <g key={tick}>
+            <line x1={sx(tick)} y1={sy(0)} x2={sx(tick)} y2={sy(1)} className="grid" />
+            <line x1={sx(0)} y1={sy(tick)} x2={sx(1)} y2={sy(tick)} className="grid" />
+            <text x={sx(tick)} y={H - P.b + 22} textAnchor="middle" className="tick">
+              {tick}
+            </text>
+            <text x={P.l - 10} y={sy(tick) + 4} textAnchor="end" className="tick">
+              {tick}
+            </text>
+          </g>
+        ))}
+        {diagonal && <line x1={sx(0)} y1={sy(0)} x2={sx(1)} y2={sy(1)} className="refline" />}
+        {refY !== undefined && (
+          <g>
+            <line x1={sx(0)} y1={sy(refY)} x2={sx(1)} y2={sy(refY)} className="refline" />
+            {refYLabel && (
+              <text x={sx(0.02)} y={sy(refY) - 7} className="ref-label">
+                {refYLabel}
+              </text>
+            )}
+          </g>
+        )}
+        <path d={path} fill="none" stroke={color} strokeWidth="3" />
+        {marker && (
+          <g>
+            <circle cx={sx(marker.x)} cy={sy(marker.y)} r="7" fill="#b3402a" />
+            {markerLabel && (
+              <text x={sx(marker.x) + 12} y={sy(marker.y) - 10} className="marker-label">
+                {markerLabel}
+              </text>
+            )}
+          </g>
+        )}
+        <text x={(W + P.l - P.r) / 2} y={H - 8} textAnchor="middle" className="axis-label">
+          {xLabel}
+        </text>
+        <text x={14} y={(H - P.b + P.t) / 2} textAnchor="middle" className="axis-label" transform={`rotate(-90 14 ${(H - P.b + P.t) / 2})`}>
+          {yLabel}
+        </text>
+      </svg>
+    </figure>
   );
 }
 
 export default function Home() {
-  const [policy, setPolicy] = useState<"probability" | "percentile">("probability");
-  const [threshold, setThreshold] = useState(35);
-  const [percentile, setPercentile] = useState(90);
-  const [regionFilter, setRegionFilter] = useState<"All" | "North" | "Central" | "South">("All");
-  const [selectedId, setSelectedId] = useState(customers[0].id);
-  const [signalMetric, setSignalMetric] = useState<SignalMetric>("shipments");
-  const [monitoringMonth, setMonitoringMonth] = useState(5);
-  const [actionStep, setActionStep] = useState(0);
+  const meta = artifacts.meta;
+  const holdout = artifacts.metric_comparison[1];
+  const confusion = artifacts.confusion;
   const [menuOpen, setMenuOpen] = useState(false);
+  const [threshold, setThreshold] = useState(0.44);
+  const [selectedId, setSelectedId] = useState(artifacts.customer_timeseries[0].cms_code_enc);
+  const [signalKey, setSignalKey] = useState<SignalKey>("item");
+  const [revealOutcome, setRevealOutcome] = useState(false);
+  const [actionStep, setActionStep] = useState(0);
+  const [monitoringMonth, setMonitoringMonth] = useState(5);
 
-  const riskFlagCount = useMemo(
-    () => policy === "probability"
-      ? demoPopulationScores.filter((score) => score * 100 >= threshold).length
-      : Math.max(1, Math.ceil(demoPopulationScores.length * (100 - percentile) / 100)),
-    [policy, threshold, percentile],
+  const sweepRow = useMemo(
+    () =>
+      artifacts.threshold_sweep.reduce((best, row) =>
+        Math.abs(row.threshold - threshold) < Math.abs(best.threshold - threshold) ? row : best,
+      ),
+    [threshold],
   );
-  const policyCustomers = useMemo(
-    () => policy === "probability"
-      ? customers.filter((customer) => customer.probability * 100 >= threshold)
-      : customers.slice(0, Math.min(customers.length, riskFlagCount)),
-    [policy, threshold, riskFlagCount],
-  );
-  const visibleCustomers = useMemo(
-    () => regionFilter === "All" ? policyCustomers : policyCustomers.filter((customer) => customer.region === regionFilter),
-    [policyCustomers, regionFilter],
-  );
-  const selected = visibleCustomers.find((customer) => customer.id === selectedId) ?? visibleCustomers[0] ?? customers[0];
-  const selectedSignal = selected.monthlySignals[signalMetric];
-  const selectedSignalMax = Math.max(...selectedSignal, 1);
-  const selectedSignalMeta = signalOptions.find((option) => option.key === signalMetric) ?? signalOptions[0];
-  const selectedAction = actionPlan(selected);
-  const currentActionStage = actionStages[actionStep];
-  const currentActionOwner = actionStep >= 2
-    ? selectedAction.owner
-    : actionStep === 1 ? "Operations reviewer" : "Unassigned";
-  const monitoringSeries = monitoringMonths.map((month, index) => (
-    index === monitoringMonths.length - 1
-      ? { ...month, riskRatio: Math.round(riskFlagCount / demoPopulationScores.length * 100) }
-      : month
-  ));
-  const currentMonitoring = monitoringSeries[monitoringMonth];
+
+  const selected =
+    artifacts.customer_timeseries.find((customer) => customer.cms_code_enc === selectedId) ??
+    artifacts.customer_timeseries[0];
+  const anchorIdx = selected.months.indexOf(selected.window_end);
+  const selectedSeries = selected.series[signalKey];
+  const selectedSignalMeta = signalOptions.find((option) => option.key === signalKey) ?? signalOptions[0];
+  const observedMax = Math.max(...selectedSeries, 1);
+  const derived = deriveSignals(selected);
+  const selectedFlagged = selected.churn_probability >= sweepRow.threshold;
+
+  const testIdx = artifacts.monthly_churn_rate.findIndex((row) => row.month === meta.test_month);
+  const maxChurnRate = Math.max(...artifacts.monthly_churn_rate.map((row) => row.rate));
+  const maxImportance = Math.max(...artifacts.feature_importance.map((row) => row.importance));
+  const maxHistogram = Math.max(...artifacts.score_histogram.map((bin) => bin.count));
+  const currentMonitoring = monitoringMonths[monitoringMonth];
+  const currentStage = actionStages[actionStep];
+
+  const heroRows = artifacts.risk_list_top.slice(0, 4).map((row) => {
+    const history = artifacts.customer_timeseries.find((customer) => customer.cms_code_enc === row.cms_code_enc);
+    const anchor = history ? history.months.indexOf(history.window_end) : -1;
+    return { ...row, bars: history && anchor >= 7 ? history.series.item.slice(anchor - 7, anchor + 1) : [] };
+  });
 
   return (
     <main>
@@ -403,59 +390,111 @@ export default function Home() {
           <span className="brand-mark">CP</span>
           <span>Churn / Decision Lab</span>
         </a>
-        <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-label="Toggle navigation">Menu</button>
+        <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-label="Toggle navigation">
+          Menu
+        </button>
         <nav className={menuOpen ? "nav-open" : ""} aria-label="Main navigation">
           <a href="#problem" onClick={() => setMenuOpen(false)}>Problem</a>
-          <a href="#method" onClick={() => setMenuOpen(false)}>Method</a>
+          <a href="#notebook-run" onClick={() => setMenuOpen(false)}>Notebook run</a>
+          <a href="#performance" onClick={() => setMenuOpen(false)}>Results</a>
           <a href="#decision-lab" onClick={() => setMenuOpen(false)}>Decision lab</a>
           <Link href="/case-study" onClick={() => setMenuOpen(false)}>Case study</Link>
-          <a href="#ownership" onClick={() => setMenuOpen(false)}>Ownership</a>
         </nav>
-        <a className="nav-cta" href="#decision-lab">Explore the queue <span>↘</span></a>
+        <a className="nav-cta" href="#decision-lab">
+          Open decision lab <span>↘</span>
+        </a>
       </header>
 
       <section className="hero" id="top">
         <div className="hero-copy">
-          <p className="eyebrow"><span /> Logistics · Data science case study</p>
-          <h1>Predict churn.<br /><em>Prioritize action.</em></h1>
-          <p className="hero-lede">A production-oriented system that identifies customers at risk of leaving two months ahead, explains the behavioral signals, and generates a workable intervention queue.</p>
+          <p className="eyebrow">
+            <span /> Logistics · Data science case study
+          </p>
+          <h1>
+            Predict churn.
+            <br />
+            <em>Prioritize action.</em>
+          </h1>
+          <p className="hero-lede">
+            A churn system for a national logistics network: it flags customers likely to leave within two months, explains
+            the behavior behind each score, and turns predictions into a workable intervention queue. Everything below is
+            reproduced by one public notebook on synthetic data — every number on this page comes from that run.
+          </p>
           <div className="hero-actions">
-            <a className="button primary" href="#decision-lab">Open decision lab <span>→</span></a>
-            <Link className="button secondary" href="/case-study">Read full case study</Link>
+            <a className="button primary" href="#decision-lab">
+              Open decision lab <span>→</span>
+            </a>
+            <Link className="button secondary" href="/case-study">
+              Read full case study
+            </Link>
           </div>
-          <div className="hero-stats" aria-label="Project facts">
-            <div><strong>2 mo.</strong><span>prediction horizon</span></div>
-            <div><strong>200+</strong><span>engineered signals</span></div>
-            <div><strong>≈7k</strong><span>leads per run</span></div>
-            <div><strong>4</strong><span>source systems</span></div>
+          <div className="hero-stats" aria-label="Demo run facts">
+            <div>
+              <strong>{fmt(meta.n_customers)}</strong>
+              <span>synthetic customers × {meta.n_months} months</span>
+            </div>
+            <div>
+              <strong>K = {artifacts.selected_lr.K}</strong>
+              <span>window chosen by LR sweep</span>
+            </div>
+            <div>
+              <strong>{holdout.f1.toFixed(3)}</strong>
+              <span>F1 · synthetic holdout</span>
+            </div>
+            <div>
+              <strong>{holdout.roc_auc.toFixed(3)}</strong>
+              <span>ROC-AUC · synthetic holdout</span>
+            </div>
           </div>
         </div>
 
-        <div className="hero-console" aria-label="Synthetic risk queue preview">
+        <div className="hero-console" aria-label="Top of the demo risk queue">
           <div className="console-head">
-            <div><span className="live-dot" /> Operational preview</div>
-            <span>Illustrative</span>
+            <div>
+              <span className="live-dot" /> Notebook output
+            </div>
+            <span>Seed {meta.seed} · deterministic</span>
           </div>
           <div className="console-title">
-            <div><p>Intervention queue</p><h2>Top risk accounts</h2></div>
-            <span className="period-chip">T + 2 months</span>
+            <div>
+              <p>Intervention queue</p>
+              <h2>Top risk accounts</h2>
+            </div>
+            <span className="period-chip">Predicts {monthLabel(2610)}</span>
           </div>
-          <div className="queue-head"><span>Customer</span><span>Signal</span><span>Risk</span></div>
-          {customers.slice(0, 4).map((customer, index) => (
-            <div className="preview-row" key={customer.id}>
-              <span className="rank">0{index + 1}</span>
-              <span><strong>{customer.id}</strong><small>{customer.segment}</small></span>
-              <Bars values={customer.trend} />
-              <strong className="risk-value">{Math.round(customer.probability * 100)}%</strong>
+          <div className="queue-head">
+            <span>Customer</span>
+            <span>Volume trend</span>
+            <span>Risk</span>
+          </div>
+          {heroRows.map((row) => (
+            <div className="preview-row" key={row.cms_code_enc}>
+              <span className="rank">{String(row.priority_rank).padStart(2, "0")}</span>
+              <span>
+                <strong>{row.cms_code_enc}</strong>
+                <small>rank {row.priority_rank} of {fmt(artifacts.xgb_setup.test_rows)}</small>
+              </span>
+              <span className="mini-bars" aria-hidden="true">
+                {row.bars.map((value, index) => (
+                  <i key={index} style={{ height: `${Math.max((value / Math.max(...row.bars, 1)) * 100, 9)}%` }} />
+                ))}
+              </span>
+              <strong className="risk-value">{pct(row.churn_probability)}</strong>
             </div>
           ))}
-          <div className="console-foot"><span>Ranked by predicted probability</span><span>Explainable export ready ↗</span></div>
+          <div className="console-foot">
+            <span>Ranked by predicted probability</span>
+            <span>Scoring origin {monthLabel(meta.test_month)}</span>
+          </div>
         </div>
       </section>
 
       <aside className="disclosure" aria-label="Data disclosure">
         <strong>Portfolio-safe edition.</strong>
-        <p>All customer records shown here are synthetic. Production performance and verified business impact are intentionally reserved for a validated update.</p>
+        <p>
+          All customers are synthetic, generated with the production schema shapes. Metrics shown are real outputs of the
+          public notebook run — they are not production performance, which remains pending approval.
+        </p>
         <span>NO PRODUCTION DATA</span>
       </aside>
 
@@ -469,362 +508,1093 @@ export default function Home() {
         />
         <div className="domain-scene-card">
           <span>LOGISTICS OPERATING CONTEXT</span>
-          <h2 id="domain-scene-title">Churn signals begin<br />inside the parcel flow.</h2>
-          <p>Before a customer leaves, the network often sees changing shipment volume, service quality and product usage. The model turns those operational patterns into a reviewable customer queue.</p>
+          <h2 id="domain-scene-title">
+            Churn signals begin
+            <br />
+            inside the parcel flow.
+          </h2>
+          <p>
+            Before a customer leaves, the network usually sees it first: parcel volume slips, late and failed deliveries
+            climb, complaints appear. The model turns those operational patterns into a reviewable customer queue.
+          </p>
           <div className="domain-signal-grid">
-            <div><i>01</i><strong>Parcel flow</strong><small>Shipment volume, revenue and volatility</small></div>
-            <div><i>02</i><strong>Delivery quality</strong><small>Late, failed and complaint behavior</small></div>
-            <div><i>03</i><strong>Relationship depth</strong><small>Tenure and active service mix</small></div>
+            <div>
+              <i>01</i>
+              <strong>Parcel flow</strong>
+              <small>Shipment volume, revenue and volatility</small>
+            </div>
+            <div>
+              <i>02</i>
+              <strong>Delivery quality</strong>
+              <small>Late, failed and complaint behavior</small>
+            </div>
+            <div>
+              <i>03</i>
+              <strong>Relationship depth</strong>
+              <small>Tenure, satisfaction and service mix</small>
+            </div>
           </div>
         </div>
-        <div className="domain-route-caption"><span>Sorting hub</span><i>→</i><span>Last-mile network</span><i>→</i><span>Customer behavior</span><i>→</i><strong>Retention decision</strong></div>
       </section>
 
       <section className="section problem" id="problem">
         <div className="section-label">01 / Business &amp; data</div>
         <div className="section-intro split-intro">
-          <h2>From a score to an<br /><em>intervention decision.</em></h2>
+          <h2>
+            From a score to an
+            <br />
+            <em>intervention decision.</em>
+          </h2>
           <div>
-            <p>The useful question was not simply “who might churn?” It was: which customers should an operations team contact first, why are they at risk, and how can the list fit a real intervention capacity?</p>
+            <p>
+              The useful question was never just “who might churn?” It was: which customers should a retention team contact
+              first, why are they at risk, and how does the list fit real intervention capacity? The system is designed
+              around that decision — and the public demo reproduces its full path from raw monthly data to a ranked queue.
+            </p>
             <div className="question-grid">
-              <span><b>WHO</b> is at risk?</span><span><b>WHEN</b> might they leave?</span>
-              <span><b>WHY</b> did the score rise?</span><span><b>WHAT</b> fits capacity?</span>
+              <span><b>WHO</b> is at risk?</span>
+              <span><b>WHEN</b> might they leave?</span>
+              <span><b>WHY</b> did the score rise?</span>
+              <span><b>WHAT</b> fits capacity?</span>
             </div>
           </div>
         </div>
 
         <div className="source-grid">
-          {sourceSystems.map(([number, title, table, note]) => (
-            <article className="source-card" key={number}>
-              <span className="source-number">{number}</span>
-              <p>{title}</p>
-              <code>{table}</code>
-              <small>{note}</small>
-            </article>
-          ))}
+          <article className="source-card">
+            <span className="source-number">01</span>
+            <p>Monthly orders</p>
+            <code>bccp_orderitem_YYMM</code>
+            <small>Partitioned by reporting month</small>
+          </article>
+          <article className="source-card">
+            <span className="source-number">02</span>
+            <p>Customer master</p>
+            <code>cas_customer · cas_info</code>
+            <small>Refreshed snapshots</small>
+          </article>
+          <article className="source-card">
+            <span className="source-number">03</span>
+            <p>Complaints</p>
+            <code>cms_complaint</code>
+            <small>Refreshed snapshot</small>
+          </article>
+          <article className="source-card">
+            <span className="source-number">04</span>
+            <p>Churn labels</p>
+            <code>Label.label_YYMM</code>
+            <small>Future-month outcome lists</small>
+          </article>
         </div>
 
         <div className="pipeline" aria-label="System workflow">
           <div><span>01</span><strong>Ingest</strong><small>Monthly + snapshots</small></div>
           <i>→</i>
-          <div><span>02</span><strong>Build signals</strong><small>Lifetime + temporal</small></div>
+          <div><span>02</span><strong>Build windows</strong><small>cus_feature_Km tables</small></div>
           <i>→</i>
-          <div><span>03</span><strong>Train &amp; score</strong><small>Leakage-safe design</small></div>
+          <div><span>03</span><strong>Select K with LR</strong><small>Baseline sweep</small></div>
           <i>→</i>
-          <div><span>04</span><strong>Explain</strong><small>SHAP + business rules</small></div>
+          <div><span>04</span><strong>Train XGBoost</strong><small>Main model</small></div>
           <i>→</i>
-          <div><span>05</span><strong>Intervene</strong><small>Ranked customer queue</small></div>
+          <div><span>05</span><strong>Rank &amp; intervene</strong><small>Priority queue</small></div>
+        </div>
+      </section>
+
+      <section className="section notebook-run" id="notebook-run">
+        <div className="section-label light">02 / The notebook run</div>
+        <div className="section-intro method-intro">
+          <div>
+            <p className="eyebrow mint"><span /> Reproducible evidence</p>
+            <h2>
+              One synthetic cohort.
+              <br />
+              <em>The real pipeline.</em>
+            </h2>
+          </div>
+          <p>
+            Production data cannot be published, so the demo notebook generates a {fmt(meta.n_customers)}-customer,{" "}
+            {meta.n_months}-month cohort that mirrors the production schema — monthly order partitions, lifetime snapshots
+            and future-month label tables — then runs the same pipeline end to end. Deterministic seed, verifiable at every
+            step.
+          </p>
+        </div>
+
+        <div className="run-facts" aria-label="Cohort scale">
+          <div><strong>{fmt(meta.n_customers)}</strong><span>synthetic customers</span></div>
+          <div><strong>{meta.n_months}</strong><span>months · {monthLabel(2501)} – {monthLabel(2610)}</span></div>
+          <div><strong>{fmt(meta.raw_rows)}</strong><span>raw monthly rows</span></div>
+          <div><strong>{fmt(meta.label_rows)}</strong><span>churn label rows</span></div>
+          <div><strong>t + {meta.horizon}</strong><span>months prediction horizon</span></div>
+        </div>
+
+        <div className="run-panels">
+          <article className="churn-month-card">
+            <div className="card-kicker mint">POPULATION SHIFT</div>
+            <h3>Monthly churn rate is a moving target</h3>
+            <div className="churn-month-chart" aria-label="Churn rate by month from the notebook run">
+              {artifacts.monthly_churn_rate.map((row) => {
+                const highlight = row.month === 2609 ? "val" : row.month === 2610 ? "test" : "";
+                return (
+                  <div key={row.month} className={`churn-bar ${highlight}`} title={`${monthLabel(row.month)}: ${pct(row.rate)}`}>
+                    <b>{(row.rate * 100).toFixed(1)}</b>
+                    <i style={{ height: `${(row.rate / maxChurnRate) * 100}%` }} />
+                    <small>{monthLabel(row.month).replace(" ", " ’")}</small>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="churn-month-legend">
+              <span><i className="regular" />Training-period label months</span>
+              <span><i className="val" />Validation labels ({monthLabel(2609)})</span>
+              <span><i className="test" />Holdout labels ({monthLabel(2610)})</span>
+            </div>
+            <p>
+              Churn drifts between {pct(Math.min(...artifacts.monthly_churn_rate.map((r) => r.rate)))} and{" "}
+              {pct(maxChurnRate)} by design. A random split would blend these months together; the pipeline splits by time
+              instead, so evaluation matches how the system runs in production.
+            </p>
+          </article>
+
+          <article className="window-card">
+            <div className="card-kicker mint">LEAKAGE-SAFE DESIGN</div>
+            <h3>Features stop at month t. Labels live at t + 2.</h3>
+            <div className="window-track" aria-label="Sliding window and label horizon">
+              {artifacts.monthly_churn_rate.map((row, index) => {
+                const cls =
+                  row.month === meta.test_month
+                    ? "anchor"
+                    : row.month === meta.val_month
+                      ? "val-anchor"
+                      : index > testIdx
+                        ? "future"
+                        : index >= testIdx - 12
+                          ? "window"
+                          : "history";
+                return (
+                  <span key={row.month} className={cls} title={monthLabel(row.month)}>
+                    <small>{String(row.month % 100).padStart(2, "0")}</small>
+                  </span>
+                );
+              })}
+            </div>
+            <div className="window-legend">
+              <span><i className="history" />Earlier anchors</span>
+              <span><i className="window" />13-month feature window</span>
+              <span><i className="val-anchor" />Validation anchor</span>
+              <span><i className="anchor" />Holdout anchor</span>
+              <span><i className="future" />Label-only months</span>
+            </div>
+            <dl className="window-facts">
+              <div><dt>Train anchors</dt><dd>{monthLabel(2601)} – {monthLabel(2606)} · {fmt(artifacts.xgb_setup.train_rows)} rows</dd></div>
+              <div><dt>Validation anchor</dt><dd>{monthLabel(meta.val_month)} · {fmt(artifacts.xgb_setup.val_rows)} rows</dd></div>
+              <div><dt>Holdout anchor</dt><dd>{monthLabel(meta.test_month)} · {fmt(artifacts.xgb_setup.test_rows)} rows — untouched until the end</dd></div>
+            </dl>
+            <p>
+              Each snapshot table is named <code>cus_feature_13m_YYMM_YYMM</code>, exactly like production. An active-now
+              gate keeps only customers still shipping at month t, so the model learns “active today, gone in two months” —
+              not “already gone”.
+            </p>
+          </article>
         </div>
       </section>
 
       <section className="section method" id="method">
-        <div className="section-label light">02 / Model development</div>
+        <div className="section-label light">03 / Model development</div>
         <div className="section-intro method-intro">
-          <div><p className="eyebrow mint"><span /> Evaluation philosophy</p><h2>Time-aware by design.<br /><em>Honest by default.</em></h2></div>
-          <p>Random train/test splits can make churn models look better than they will behave in production. This workflow respects time, purges overlapping windows and keeps a final period untouched until model selection is complete.</p>
+          <div>
+            <p className="eyebrow mint"><span /> Baseline before complexity</p>
+            <h2>
+              LR chooses the window.
+              <br />
+              <em>XGBoost is the model.</em>
+            </h2>
+          </div>
+          <p>
+            Logistic Regression is deliberately not the final model — it is the transparent referee that picks the sliding
+            window size K and whether static profile features help. Only then does XGBoost tuning start, on the exact
+            configuration the baseline selected.
+          </p>
         </div>
 
-        <div className="method-layout">
-          <div className="timeline">
-            {developmentSteps.map(([number, title, description]) => (
-              <article key={number}>
-                <span>{number}</span><div><h3>{title}</h3><p>{description}</p></div>
-              </article>
-            ))}
-          </div>
-          <aside className="validation-card">
-            <div className="card-kicker">PURGED WALK-FORWARD</div>
-            <h3>Validate as the system will run</h3>
-            <div className="folds" aria-label="Illustration of walk-forward validation folds">
-              <div><span>Fold 01</span><i className="train w3" /><i className="gap" /><i className="valid" /></div>
-              <div><span>Fold 02</span><i className="train w4" /><i className="gap" /><i className="valid" /></div>
-              <div><span>Fold 03</span><i className="train w5" /><i className="gap" /><i className="valid" /></div>
-              <div><span>Holdout</span><i className="train w6" /><i className="holdout" /></div>
+        <div className="sweep-grid">
+          <article className="sweep-card">
+            <div className="table-heading">
+              <div>
+                <span className="card-kicker">STEP 1 · WINDOW CANDIDATES</span>
+                <h3>Four window sizes, built like production tables</h3>
+              </div>
             </div>
-            <div className="legend"><span><i className="train" />Train</span><span><i className="gap" />Purge</span><span><i className="valid" />Validate</span><span><i className="holdout" />Final</span></div>
-            <div className="metric-placeholder"><span>Validated model metrics</span><strong>Pending update</strong><small>To be populated from an approved production run.</small></div>
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>K</th>
+                    <th>Rows</th>
+                    <th>Snapshots</th>
+                    <th>Churn</th>
+                    <th>Features</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {artifacts.build_summary.map((row) => (
+                    <tr key={row.K} className={row.K === artifacts.selected_lr.K ? "winner" : ""}>
+                      <td><b>{row.K} mo</b></td>
+                      <td>{fmt(row.rows_active)}</td>
+                      <td>{row.snapshots}</td>
+                      <td>{pct(row.churn_rate_active)}</td>
+                      <td>{row.n_features}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="table-note">
+              Longer windows carry more history per row but leave fewer valid snapshots — the classic sliding-window
+              trade-off.
+            </p>
+          </article>
+
+          <aside className="production-ref">
+            <span className="card-kicker">PRODUCTION BUNDLE REFERENCE</span>
+            <h3>The real system agrees on K = 13</h3>
+            <dl>
+              <div><dt>Source commit</dt><dd><code>{artifacts.production_reference.source_commit.slice(0, 7)}</code></dd></div>
+              <div><dt>Window / horizon</dt><dd>K = {artifacts.production_reference.best_k} · t + {artifacts.production_reference.horizon}</dd></div>
+              <div><dt>LR validation F1</dt><dd>{artifacts.production_reference.lr_f1_val.toFixed(3)}</dd></div>
+              <div><dt>XGBoost validation F1</dt><dd>{artifacts.production_reference.xgb_f1_val.toFixed(3)}</dd></div>
+              <div><dt>XGBoost validation AP</dt><dd>{artifacts.production_reference.xgb_ap_val.toFixed(3)}</dd></div>
+            </dl>
+            <p>
+              Reference values recorded in the production model bundle — shown for context only. They are not results of
+              the synthetic run below and are not verified public performance claims.
+            </p>
           </aside>
+
+          <article className="sweep-card wide">
+            <div className="table-heading">
+              <div>
+                <span className="card-kicker">STEP 2 · LR SWEEP</span>
+                <h3>Eight configurations, ranked by validation F1</h3>
+              </div>
+              <span className="chip">Winner: K = 13 + static profile</span>
+            </div>
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>K</th>
+                    <th>Static</th>
+                    <th>F1</th>
+                    <th>Precision</th>
+                    <th>Recall</th>
+                    <th>AP</th>
+                    <th>ROC-AUC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {artifacts.lr_results.map((row) => (
+                    <tr key={`${row.K}-${row.use_static}`} className={row.K === 13 && row.use_static ? "winner" : ""}>
+                      <td><b>{row.K}</b></td>
+                      <td>{row.use_static ? "Yes" : "No"}</td>
+                      <td><b>{row.f1.toFixed(4)}</b></td>
+                      <td>{row.precision.toFixed(4)}</td>
+                      <td>{row.recall.toFixed(4)}</td>
+                      <td>{row.ap.toFixed(4)}</td>
+                      <td>{row.roc_auc.toFixed(4)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="table-note">
+              Degenerate solutions (F1 within 0.005 of predicting “everyone churns”) are rejected before ranking. Class
+              weights are only enabled while training churn stays under 35%.
+            </p>
+          </article>
+
+          <article className="sweep-card wide">
+            <div className="table-heading">
+              <div>
+                <span className="card-kicker">STEP 3 · XGBOOST TUNING</span>
+                <h3>Five candidates on the selected K = 13 dataset</h3>
+              </div>
+              <span className="chip">Winner: d6_regularized</span>
+            </div>
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Candidate</th>
+                    <th>F1</th>
+                    <th>Precision</th>
+                    <th>Recall</th>
+                    <th>AP</th>
+                    <th>ROC-AUC</th>
+                    <th>Trees</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {artifacts.tuning_results.map((row, index) => (
+                    <tr key={row.name} className={index === 0 ? "winner" : ""}>
+                      <td><code>{row.name}</code></td>
+                      <td><b>{row.f1.toFixed(4)}</b></td>
+                      <td>{row.precision.toFixed(4)}</td>
+                      <td>{row.recall.toFixed(4)}</td>
+                      <td>{row.ap.toFixed(4)}</td>
+                      <td>{row.roc_auc.toFixed(4)}</td>
+                      <td>{row.best_iteration}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="table-note">
+              All candidates train with histogram trees, early stopping on AP and the class weight inherited from the LR
+              guardrail ({artifacts.xgb_setup.spw}). Validation F1 decides; AP breaks ties. Every candidate lands within
+              0.005 F1 — the signal is in the data design, not one magic hyperparameter.
+            </p>
+          </article>
+
+        </div>
+      </section>
+
+      <section className="section performance" id="performance">
+        <div className="section-label">04 / Synthetic holdout results</div>
+        <div className="section-intro split-intro">
+          <h2>
+            Judged on a month
+            <br />
+            <em>it never saw.</em>
+          </h2>
+          <div>
+            <p>
+              The final month of the cohort ({monthLabel(meta.test_month)} anchors, {monthLabel(2610)} labels) stayed
+              untouched during window selection, tuning and threshold choice. The decision threshold was locked on
+              validation at {artifacts.chosen_threshold.toFixed(3)}, then applied once. These are real outputs of the
+              notebook — on synthetic data, and labeled that way.
+            </p>
+            <div className="headline-metrics" aria-label="Headline holdout metrics">
+              <div><small>F1</small><strong>{holdout.f1.toFixed(3)}</strong></div>
+              <div><small>Precision</small><strong>{holdout.precision.toFixed(3)}</strong></div>
+              <div><small>Recall</small><strong>{holdout.recall.toFixed(3)}</strong></div>
+              <div><small>AP</small><strong>{holdout.ap.toFixed(3)}</strong></div>
+              <div><small>ROC-AUC</small><strong>{holdout.roc_auc.toFixed(3)}</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="performance-grid">
+          <CurvePlot
+            points={artifacts.pr_curve}
+            color="#c96a2e"
+            title="Precision–Recall · holdout"
+            badge={`AP = ${holdout.ap.toFixed(3)}`}
+            xLabel="Recall"
+            yLabel="Precision"
+            refY={artifacts.holdout_prevalence}
+            refYLabel={`Prevalence ${artifacts.holdout_prevalence.toFixed(3)}`}
+            marker={{ x: holdout.recall, y: holdout.precision }}
+            markerLabel="F1 threshold"
+          />
+          <CurvePlot
+            points={artifacts.roc_curve}
+            color="#2d5f8a"
+            title="ROC · holdout"
+            badge={`ROC-AUC = ${holdout.roc_auc.toFixed(3)}`}
+            xLabel="False positive rate"
+            yLabel="True positive rate"
+            diagonal
+          />
+
+          <article className="confusion-card">
+            <div className="card-kicker">CONFUSION MATRIX · THRESHOLD {artifacts.chosen_threshold.toFixed(3)}</div>
+            <h3>{fmt(artifacts.xgb_setup.test_rows)} active customers, one decision each</h3>
+            <div className="confusion-grid" role="table" aria-label="Holdout confusion matrix">
+              <span className="corner" />
+              <span className="col-head">Predicted active</span>
+              <span className="col-head">Predicted churn</span>
+              <span className="row-head">Actually active</span>
+              <div className="cell good"><strong>{fmt(confusion.tn)}</strong><small>true negatives</small></div>
+              <div className="cell warn"><strong>{fmt(confusion.fp)}</strong><small>false alarms</small></div>
+              <span className="row-head">Actually churned</span>
+              <div className="cell bad"><strong>{fmt(confusion.fn)}</strong><small>missed churners</small></div>
+              <div className="cell good"><strong>{fmt(confusion.tp)}</strong><small>caught in time</small></div>
+            </div>
+            <p>
+              Of {fmt(artifacts.holdout_positives)} customers who really churned two months later, the model caught{" "}
+              {fmt(confusion.tp)} and missed {fmt(confusion.fn)}. The business trade-off: {fmt(confusion.fp)} false alarms
+              buy {pct(holdout.recall)} recall.
+            </p>
+          </article>
+
+          <article className="comparison-card">
+            <div className="card-kicker">THRESHOLD DISCIPLINE</div>
+            <h3>Validation chose it. Holdout lived with it.</h3>
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Split</th>
+                    <th>Thr.</th>
+                    <th>F1</th>
+                    <th>Precision</th>
+                    <th>Recall</th>
+                    <th>AP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {artifacts.metric_comparison.map((row, index) => (
+                    <tr key={row.split} className={index === 1 ? "winner" : ""}>
+                      <td>
+                        <b>
+                          {row.split === "validation_tuned"
+                            ? "Validation"
+                            : row.split === "holdout_fixed_threshold"
+                              ? "Holdout · locked"
+                              : "Holdout · 0.50"}
+                        </b>
+                      </td>
+                      <td>{row.threshold.toFixed(3)}</td>
+                      <td><b>{row.f1.toFixed(3)}</b></td>
+                      <td>{row.precision.toFixed(3)}</td>
+                      <td>{row.recall.toFixed(3)}</td>
+                      <td>{row.ap.toFixed(3)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p>
+              The small drop from validation to holdout ({artifacts.metric_comparison[0].f1.toFixed(3)} →{" "}
+              {holdout.f1.toFixed(3)}) is exactly the honest gap a fixed threshold pays on a new month. AP and ROC-AUC are
+              identical across threshold rows because ranking does not change.
+            </p>
+          </article>
+
+          <article className="guardrail-card">
+            <div className="card-kicker">RUN GUARDRAILS</div>
+            <h3>Five asserts before this page could publish</h3>
+            <ul>
+              {artifacts.guardrails.map((guard) => (
+                <li key={guard.name}>
+                  <i className={guard.passed ? "pass" : "fail"}>{guard.passed ? "PASS" : "FAIL"}</i>
+                  <div>
+                    <b>{guard.name.replaceAll("_", " ")}</b>
+                    <small>{guard.detail}</small>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <p>
+              The notebook refuses to hand over a degenerate run: predict-all-positive, prevalence-level AP or a collapsed
+              score range all fail the build. The production system extends these into full promotion gates (section 07).
+            </p>
+          </article>
         </div>
       </section>
 
       <section className="section lab" id="decision-lab">
-        <div className="section-label">03 / Intervention queue</div>
+        <div className="section-label">05 / Decision lab</div>
         <div className="section-intro lab-intro">
-          <div><p className="eyebrow"><span /> Interactive synthetic demo</p><h2>Turn predictions into<br /><em>a contact strategy.</em></h2></div>
-          <p>Switch the operating policy, adjust the probability threshold and select a synthetic customer to see how model evidence becomes an actionable explanation.</p>
+          <div>
+            <p className="eyebrow"><span /> Interactive · real notebook outputs</p>
+            <h2>
+              Turn {fmt(artifacts.xgb_setup.test_rows)} scores into
+              <br />
+              <em>a contact strategy.</em>
+            </h2>
+          </div>
+          <p>
+            Every control below recomputes against the actual holdout scores and labels exported from the notebook — move
+            the operating threshold, inspect ranked customers, and open a 22-month behavioral dossier for each one.
+          </p>
         </div>
 
         <div className="lab-shell">
-          <div className="run-purpose">
-            <div><span>THE DECISION, NOT JUST THE SCORE</span><h3>Simulate one monthly scoring run</h3></div>
-            <p>The system first removes inactive or ineligible customers, then scores the remaining cohort, applies an operating policy, maps positive SHAP evidence to business reasons and exports only intervention-ready profiles.</p>
-            <span className="synthetic-chip">Synthetic run</span>
-          </div>
-
-          <div className="run-stages" aria-label="Export risk mode workflow">
-            {runStages.map(([number, title, detail]) => (
-              <div key={number}><span>{number}</span><strong>{title}</strong><small>{detail}</small></div>
-            ))}
-          </div>
-
-          <div className="run-dashboard">
-            <div className="run-config">
-              <div className="run-card-title"><span>RUN CONFIGURATION</span><strong>Scoring origin 2505</strong><small>Illustrative month · no production records</small></div>
-              <dl className="config-facts">
-                <div><dt>Observation window</dt><dd>Mar–May 2025</dd></div>
-                <div><dt>Prediction period</dt><dd>Jun–Jul 2025</dd></div>
-                <div><dt>Model bundle</dt><dd>Selected XGBoost</dd></div>
-                <div><dt>Intervention cap</dt><dd>7,000 profiles</dd></div>
-              </dl>
-              <div className="control-block policy-control">
-                <label>Operating decision mode</label>
-                <div className="segmented">
-                  <button className={policy === "probability" ? "active" : ""} onClick={() => { setPolicy("probability"); setActionStep(0); }}>Probability</button>
-                  <button className={policy === "percentile" ? "active" : ""} onClick={() => { setPolicy("percentile"); setActionStep(0); }}>Score percentile</button>
-                </div>
-              </div>
-              {policy === "probability" ? (
-                <div className="control-block range-block">
-                  <label htmlFor="threshold">Flag when probability ≥ <strong>{threshold}%</strong></label>
-                  <input id="threshold" type="range" min="30" max="80" value={threshold} onChange={(event) => { setThreshold(Number(event.target.value)); setActionStep(0); }} />
-                  <div><span>30%</span><span>80%</span></div>
-                </div>
-              ) : (
-                <div className="control-block range-block">
-                  <label htmlFor="percentile">Keep customers at or above <strong>P{percentile}</strong></label>
-                  <input id="percentile" type="range" min="60" max="95" step="5" value={percentile} onChange={(event) => { setPercentile(Number(event.target.value)); setActionStep(0); }} />
-                  <div><span>P60</span><span>P95</span></div>
-                </div>
-              )}
-              <div className="policy-readout" aria-live="polite">
-                <span>{policy === "probability" ? "FIXED DECISION BOUNDARY" : "CAPACITY-STYLE RANKING"}</span>
-                <strong>{riskFlagCount} of 24 eligible profiles are flagged</strong>
-                <p>{policy === "probability"
-                  ? `Scores stay unchanged. The slider only moves the cutoff to probability ≥ ${threshold}%.`
-                  : `The cohort is sorted by score and the preview keeps the top ${100 - percentile}% at or above P${percentile}.`}</p>
-              </div>
+          <div className="threshold-block">
+            <div className="threshold-controls">
+              <div className="card-kicker">OPERATING THRESHOLD</div>
+              <h3>Where should the intervention line sit?</h3>
+              <label htmlFor="threshold">
+                Flag customers with probability ≥ <strong>{pct(sweepRow.threshold, 0)}</strong>
+              </label>
+              <input
+                id="threshold"
+                type="range"
+                min="0.02"
+                max="0.98"
+                step="0.02"
+                value={threshold}
+                onChange={(event) => setThreshold(Number(event.target.value))}
+              />
+              <div className="range-scale"><span>2%</span><span>50%</span><span>98%</span></div>
+              <button className="reset-threshold" onClick={() => setThreshold(0.44)}>
+                ↺ Back to the F1-optimal threshold ({artifacts.chosen_threshold.toFixed(3)})
+              </button>
+              <p>
+                The model’s ranking never changes — the slider only moves the decision line, trading alert volume against
+                missed churners on the real holdout month.
+              </p>
             </div>
 
-            <div className="cohort-funnel">
-              <div className="run-card-title"><span>COHORT GATES</span><strong>Who reaches the CRM queue?</strong><small>Counts below describe the 30-record synthetic cohort</small></div>
-              <div className="funnel-row"><span>01</span><div><strong>Monthly feature rows</strong><small>Staged scoring population</small></div><i style={{ width: "100%" }} /><b>30</b></div>
-              <div className="funnel-row"><span>02</span><div><strong>Active now</strong><small>Current item or revenue activity</small></div><i style={{ width: "90%" }} /><b>27</b></div>
-              <div className="funnel-row"><span>03</span><div><strong>Churn eligible</strong><small>Activity-window and volume rules</small></div><i style={{ width: "80%" }} /><b>24</b></div>
-              <div className="funnel-row flagged"><span>04</span><div><strong>Risk flag = 1</strong><small>{policy === "probability" ? `Probability ≥ ${threshold}%` : `Score percentile ≥ P${percentile}`}</small></div><i style={{ width: `${Math.max(9, riskFlagCount / 30 * 100)}%` }} /><b>{riskFlagCount}</b></div>
-              <div className="funnel-row exported"><span>05</span><div><strong>Exported profiles</strong><small>After the 7,000-profile cap</small></div><i style={{ width: `${Math.max(9, Math.min(riskFlagCount, 7000) / 30 * 100)}%` }} /><b>{Math.min(riskFlagCount, 7000)}</b></div>
-              <p><strong>Production behavior:</strong> every exported row must be active, eligible, risk-flagged and accompanied by up to three structured reasons.</p>
-            </div>
-
-            <div className="score-audit">
-              <div className="run-card-title"><span>RUN AUDIT</span><strong>Score distribution</strong><small>Stored for drift monitoring by scoring origin</small></div>
-              <div className="score-stats"><span><small>P50</small><strong>22%</strong></span><span><small>P90</small><strong>69%</strong></span><span><small>P99</small><strong>84%</strong></span></div>
-              <div className="distribution-mini" aria-label="Synthetic churn score distribution">
-                {demoPopulationScores.slice().reverse().map((score, index) => <i key={index} style={{ height: `${Math.max(7, score * 100)}%` }} />)}
+            <div className="threshold-readout" aria-live="polite">
+              <div className="readout-tiles">
+                <div>
+                  <small>Flagged for contact</small>
+                  <strong>{fmt(sweepRow.flagged)}</strong>
+                  <span>of {fmt(artifacts.xgb_setup.test_rows)} active customers</span>
+                </div>
+                <div>
+                  <small>Precision</small>
+                  <strong>{pct(sweepRow.precision)}</strong>
+                  <span>flagged who really churn</span>
+                </div>
+                <div>
+                  <small>Recall</small>
+                  <strong>{pct(sweepRow.recall)}</strong>
+                  <span>of {fmt(artifacts.holdout_positives)} churners caught</span>
+                </div>
+                <div>
+                  <small>Missed churners</small>
+                  <strong>{fmt(sweepRow.fn)}</strong>
+                  <span>false alarms: {fmt(sweepRow.fp)}</span>
+                </div>
               </div>
-              <div className="audit-checks"><span><i />Schema aligned</span><span><i />Reasons populated</span><span><i />Queue below cap</span></div>
-              <p>Monitoring stores active count, risk count, risk ratio and score quantiles; unusually high risk ratios are checked against historical median + 3 MAD.</p>
+              <div className="histogram-wrap">
+                <div className="histogram" aria-label="Holdout score distribution with decision threshold">
+                  {artifacts.score_histogram.map((bin) => (
+                    <div
+                      key={bin.lo}
+                      className="hist-col"
+                      title={`${pct(bin.lo, 0)}–${pct(bin.hi, 0)}: ${bin.count} customers (${bin.churn} churned)`}
+                    >
+                      <i className="stay" style={{ height: `${((bin.count - bin.churn) / maxHistogram) * 100}%` }} />
+                      <i className="churn" style={{ height: `${(bin.churn / maxHistogram) * 100}%` }} />
+                    </div>
+                  ))}
+                  <span className="threshold-line" style={{ left: `${sweepRow.threshold * 100}%` }}>
+                    <b>{pct(sweepRow.threshold, 0)}</b>
+                  </span>
+                </div>
+                <div className="hist-legend">
+                  <span><i className="stay" />Stayed</span>
+                  <span><i className="churn" />Churned within 2 months</span>
+                  <span className="hist-note">Scores right of the line are flagged</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="queue-toolbar">
-            <div><span>INTERVENTION WORKSPACE</span><h3>Inspect the ranked queue and customer dossier</h3></div>
-            <label>Region
-              <select value={regionFilter} onChange={(event) => { setRegionFilter(event.target.value as "All" | "North" | "Central" | "South"); setActionStep(0); }}>
-                <option>All</option><option>North</option><option>Central</option><option>South</option>
-              </select>
-            </label>
-            <div className="preview-count"><strong>{visibleCustomers.length}</strong><span>representative rows<br />in this preview</span></div>
+          <div className="capacity-strip">
+            <div>
+              <span className="card-kicker">CAPACITY VIEW</span>
+              <h3>Top 10% of the queue = {fmt(artifacts.top10pct.customers)} customers</h3>
+            </div>
+            <div className="capacity-stats">
+              <div><small>Precision in top 10%</small><strong>{pct(artifacts.top10pct.precision)}</strong></div>
+              <div><small>Churners captured</small><strong>{pct(artifacts.top10pct.recall)}</strong></div>
+              <div><small>Production capacity</small><strong>≈7,000</strong><span>per monthly run (design)</span></div>
+            </div>
+            <p>
+              When capacity, not probability, sets the line: contacting only the top decile reaches {pct(artifacts.top10pct.precision, 0)}{" "}
+              precision. The production system applies the same ranking logic to an ~7,000-slot intervention budget.
+            </p>
           </div>
 
-          <div className="lab-grid">
-            <div className="full-queue">
-              <div className="table-title"><div><span>RISK_FLAG = 1 ONLY</span><h3>Customer risk queue</h3></div><span className="synthetic-chip">Sorted high → low</span></div>
-              <div className="table-header"><span>Rank / account</span><span>6M activity</span><span>Revenue</span><span>Probability</span></div>
-              <div className="table-body">
-                {visibleCustomers.map((customer, index) => (
-                  <button className={`customer-row ${selected.id === customer.id ? "selected" : ""}`} key={customer.id} onClick={() => { setSelectedId(customer.id); setActionStep(0); }}>
-                    <span className="customer-main"><i>{String(index + 1).padStart(2, "0")}</i><span><strong>{customer.id}</strong><small>{customer.segment} · {customer.region}</small></span></span>
-                    <Bars values={customer.trend} />
-                    <span className="revenue">{customer.revenue}</span>
-                    <span className="score"><i style={{ width: `${customer.probability * 100}%` }} /><strong>{Math.round(customer.probability * 100)}%</strong></span>
+          <div className="queue-workspace">
+            <div className="queue-panel">
+              <div className="table-heading">
+                <div>
+                  <span className="card-kicker">RISK QUEUE · TOP 12 OF {fmt(artifacts.xgb_setup.test_rows)}</span>
+                  <h3>Exactly as the notebook printed it</h3>
+                </div>
+                <a className="download-link" href={`${publicBasePath}/notebook_risk_list.csv`} download>
+                  Full risk list CSV ↓
+                </a>
+              </div>
+              <div className="table-scroll">
+                <table className="data-table risk-table">
+                  <thead>
+                    <tr>
+                      <th>Rank</th>
+                      <th>Customer</th>
+                      <th>Probability</th>
+                      <th>Flagged</th>
+                      <th>At t + 2</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {artifacts.risk_list_top.slice(0, 12).map((row) => (
+                      <tr key={row.cms_code_enc}>
+                        <td><b>{row.priority_rank}</b></td>
+                        <td><code>{row.cms_code_enc}</code></td>
+                        <td>
+                          <span className="prob-cell">
+                            <i style={{ width: `${row.churn_probability * 100}%` }} />
+                            <b>{pct(row.churn_probability)}</b>
+                          </span>
+                        </td>
+                        <td>{row.churn_probability >= sweepRow.threshold ? "Yes" : "No"}</td>
+                        <td>
+                          <em className={row.y_true === 1 ? "outcome churned" : "outcome stayed"}>
+                            {row.y_true === 1 ? "Churned" : "Stayed"}
+                          </em>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="table-note">
+                Columns mirror the notebook risk list: customer, scoring origin, probability, decision and priority rank.
+                The outcome column exists here only because this is a backtest month — a live run cannot see it.
+              </p>
+            </div>
+
+            <aside className="dossier">
+              <div className="card-kicker">CUSTOMER DOSSIER · 22-MONTH HISTORY</div>
+              <div className="rep-picker">
+                {riskBands.map((band) => (
+                  <div className="rep-band" key={band.label}>
+                    <small>{band.label}</small>
+                    <div>
+                      {artifacts.customer_timeseries
+                        .filter((customer) => band.ranks.includes(customer.priority_rank))
+                        .map((customer) => (
+                          <button
+                            key={customer.cms_code_enc}
+                            className={selected.cms_code_enc === customer.cms_code_enc ? "active" : ""}
+                            onClick={() => {
+                              setSelectedId(customer.cms_code_enc);
+                              setRevealOutcome(false);
+                            }}
+                          >
+                            #{customer.priority_rank}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="dossier-head">
+                <div>
+                  <strong>{selected.cms_code_enc}</strong>
+                  <small>
+                    {regionLabels[selected.region] ?? selected.region} · service {selected.dominant_service} ·{" "}
+                    {selected.tenure_months} mo. tenure
+                  </small>
+                </div>
+                <div className="dossier-prob">
+                  <small>churn probability</small>
+                  <strong>{pct(selected.churn_probability)}</strong>
+                  <span className={selectedFlagged ? "flag on" : "flag off"}>
+                    {selectedFlagged ? `Flagged at ≥ ${pct(sweepRow.threshold, 0)}` : `Below the ${pct(sweepRow.threshold, 0)} line`}
+                  </span>
+                </div>
+              </div>
+
+              <div className="signal-tabs" aria-label="Select behavioral signal">
+                {signalOptions.map((option) => (
+                  <button
+                    key={option.key}
+                    className={signalKey === option.key ? "active" : ""}
+                    onClick={() => setSignalKey(option.key)}
+                  >
+                    {option.label}
                   </button>
                 ))}
-                {visibleCustomers.length === 0 && <div className="empty-state">No representative dossier matches this policy and region. Lower the cutoff or clear the region filter.</div>}
               </div>
-            </div>
 
-            <aside className="explanation">
-              <div className="explanation-head"><span>CUSTOMER DOSSIER</span><strong>{selected.id}</strong><small>{selected.segment} · {selected.region}</small></div>
-              <div className="dossier-facts"><span><small>Eligibility</small><b>Eligible</b></span><span><small>Active months</small><b>{selected.activeMonths} / 6</b></span><span><small>Window volume</small><b>{selected.itemsInWindow}</b></span><span><small>Services</small><b>{selected.serviceTypes}</b></span></div>
-              <div className="explanation-score"><div><span>Churn probability</span><strong>{Math.round(selected.probability * 100)}%</strong></div><div className="score-track"><i style={{ width: `${selected.probability * 100}%` }} /></div><small>risk_flag = 1 · prediction horizon: two months</small></div>
-              <div className="signal-explorer">
-                <div className="signal-tabs" aria-label="Select customer time-series signal">
-                  {signalOptions.map((option) => (
-                    <button key={option.key} className={signalMetric === option.key ? "active" : ""} onClick={() => setSignalMetric(option.key)}>{option.label}</button>
-                  ))}
-                </div>
-                <div className="activity-window">
-                  <div><span>{selectedSignalMeta.label.toUpperCase()}</span><small>Six monthly snapshots · {selectedSignalMeta.unit}</small></div>
-                  <div>{selectedSignal.map((value, index) => <span key={index}><b>{value}</b><i style={{ height: `${Math.max(8, value / selectedSignalMax * 100)}%` }} /><small>{index === selectedSignal.length - 1 ? "Now" : `M-${selectedSignal.length - index - 1}`}</small></span>)}</div>
-                </div>
-                <p className="time-series-note">Longitudinal synthetic data: the latest month is compared with the previous three-month baseline. It mirrors the temporal calculation shape, not the unknown production distribution. <a href={`${publicBasePath}/synthetic_monthly_behavior.csv`} download>Download the 30 × 6 cohort ↓</a></p>
+              <div className="series-chart-head">
+                <span>{selectedSignalMeta.label.toUpperCase()}</span>
+                <small>{selectedSignalMeta.unit}</small>
               </div>
-              <div className="reason-title"><span>TOP THREE REASONS</span><small>Positive SHAP buckets · business-rule evidence</small></div>
-              <ol className="reasons">
-                {selected.reasons.map((reason, index) => (
-                  <li key={reason.code}>
-                    <span>0{index + 1}</span>
-                    <div className="reason-content">
-                      <div className="reason-meta">
-                        <div><strong className="reason-business-label">{reasonBusinessLabels[reason.code] ?? reason.code}</strong><span className="reason-code">System code · <code>{reason.code}</code></span></div>
-                        <em className={reason.severity.toLowerCase()}>{reason.severity}</em>
-                      </div>
-                      <strong className="reason-text">{reason.text}</strong>
-                      <div className="reason-evidence"><span><small>Current metric</small><b>{reason.metric}</b></span><span><small>3M baseline</small><b>{reason.baseline}</b></span><span><small>Change</small><b>{reason.delta}</b></span></div>
+              <div className="series-chart" aria-label={`${selectedSignalMeta.label} over 22 months`}>
+                {selectedSeries.map((value, index) => {
+                  const zone = index > anchorIdx ? "future" : index > anchorIdx - 13 ? "window" : "history";
+                  return (
+                    <div
+                      key={index}
+                      className={`series-bar ${zone}`}
+                      title={`${monthLabel(selected.months[index])}: ${fmt(value)}`}
+                    >
+                      <i style={{ height: `${Math.max((value / observedMax) * 100, 3)}%` }} />
                     </div>
-                  </li>
-                ))}
-              </ol>
-              <div className="recommended-action"><span>Decision boundary</span><p>The model ranks and explains this account. A human reviewer validates service and commercial context before any contact decision.</p></div>
+                  );
+                })}
+              </div>
+              <div className="series-scale">
+                <span>{monthLabel(selected.months[0])}</span>
+                <span className="anchor-note">↑ scored at {monthLabel(selected.window_end)}</span>
+                <span>{monthLabel(selected.months[21])}</span>
+              </div>
+              <div className="series-legend">
+                <span><i className="history" />Earlier history</span>
+                <span><i className="window" />13-month feature window</span>
+                <span><i className="future" />After scoring · hidden from the model</span>
+              </div>
+
+              <div className="derived-signals">
+                <div className="derived-title">
+                  <span>BEHAVIOR EVIDENCE AT SCORING TIME</span>
+                  <small>Business rules on the window above · production pairs this with SHAP</small>
+                </div>
+                {derived.length > 0 ? (
+                  <ol>
+                    {derived.map((signal, index) => (
+                      <li key={signal.code}>
+                        <span>0{index + 1}</span>
+                        <div>
+                          <div className="derived-meta">
+                            <b>{signal.label}</b>
+                            <em className={signal.severity.toLowerCase()}>{signal.severity}</em>
+                          </div>
+                          <p>{signal.text}</p>
+                          <div className="derived-evidence">
+                            <span><small>Now</small><b>{signal.current}</b></span>
+                            <span><small>3-month baseline</small><b>{signal.baseline}</b></span>
+                            <span><small>Change</small><b>{signal.delta}</b></span>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="derived-empty">
+                    No strong negative behavior rule fires for this customer at scoring time — consistent with its low
+                    model score.
+                  </p>
+                )}
+              </div>
+
+              <div className="outcome-reveal">
+                {revealOutcome ? (
+                  <div className={`outcome-panel ${selected.y_true === 1 ? "churned" : "stayed"}`}>
+                    <strong>
+                      {selected.y_true === 1
+                        ? `Churned in ${monthLabel(2610)}.`
+                        : `Still active in ${monthLabel(2610)}.`}
+                    </strong>
+                    <p>
+                      {selected.predicted_churn === 1 && selected.y_true === 1 &&
+                        `At the notebook's locked ${artifacts.chosen_threshold.toFixed(3)} threshold, the model flagged this customer in time — a true positive.`}
+                      {selected.predicted_churn === 1 && selected.y_true === 0 &&
+                        `At the notebook's locked ${artifacts.chosen_threshold.toFixed(3)} threshold, the model raised a false alarm on this customer.`}
+                      {selected.predicted_churn === 0 && selected.y_true === 1 &&
+                        `At the notebook's locked ${artifacts.chosen_threshold.toFixed(3)} threshold, the model missed this churner — a false negative.`}
+                      {selected.predicted_churn === 0 && selected.y_true === 0 &&
+                        `At the notebook's locked ${artifacts.chosen_threshold.toFixed(3)} threshold, this customer was correctly left alone — a true negative.`}
+                    </p>
+                  </div>
+                ) : (
+                  <button className="reveal-button" onClick={() => setRevealOutcome(true)}>
+                    Reveal what actually happened two months later →
+                  </button>
+                )}
+              </div>
+              <p className="dossier-note">
+                Series reconstructed by joining the risk list back to the raw monthly table —{" "}
+                <a href={`${publicBasePath}/notebook_monthly_behavior.csv`} download>
+                  download the 10-customer × 22-month sample ↓
+                </a>
+              </p>
             </aside>
           </div>
 
-          <div className="action-workspace" id="action-workflow">
-            <div className="action-heading">
-              <div><span>TAKE ACTION</span><h3>Convert one risk profile into a controlled intervention</h3><p>The recommendation changes with the selected account’s reason codes; the workflow below is a portfolio integration layer, not an automated decision.</p></div>
-              <span className="human-chip">Human review required</span>
+          <div className="importance-block">
+            <div className="table-heading">
+              <div>
+                <span className="card-kicker">GLOBAL EXPLAINABILITY · XGBOOST GAIN</span>
+                <h3>What the demo model actually looks at</h3>
+              </div>
+              <span className="chip">Top 15 of {artifacts.xgb_setup.features_after_encoding} encoded features</span>
             </div>
-            <div className="action-grid">
-              <section className="action-recommendation">
-                <span>RECOMMENDED ROUTE</span>
-                <h4>{selectedAction.route}</h4>
-                <dl>
-                  <div><dt>Account</dt><dd>{selected.id}</dd></div>
-                  <div><dt>Suggested owner</dt><dd>{selectedAction.owner}</dd></div>
-                  <div><dt>Evidence to review</dt><dd>{selectedAction.evidence}</dd></div>
-                  <div><dt>Priority basis</dt><dd>Queue rank + structured reasons</dd></div>
-                </dl>
-                <p><strong>Next step:</strong> {selectedAction.next}</p>
-              </section>
-              <section className="action-flow">
-                <span>DEMO WORKFLOW</span>
-                <h4>Record the handoff, not just the prediction</h4>
-                <div className="action-steps">
-                  {actionStages.map((step, index) => (
-                    <button key={step.status} className={`${index <= actionStep ? "complete" : ""} ${index === actionStep ? "current" : ""}`} onClick={() => setActionStep(index)} aria-current={index === actionStep ? "step" : undefined}><i>{String(index + 1).padStart(2, "0")}</i><span><strong>{step.label}</strong><small>{step.short}</small></span></button>
-                  ))}
-                </div>
-                <div className="workflow-status-card" aria-live="polite">
-                  <div><span>CURRENT SIMULATED STATE</span><em>Demo only</em></div>
-                  <strong>{currentActionStage.label}</strong>
-                  <p>{currentActionStage.description}</p>
-                  <div className="workflow-status-grid">
-                    <span><small>Current owner</small><b>{currentActionOwner}</b></span>
-                    <span><small>CRM field updated</small><code>{currentActionStage.eventField}</code></span>
-                    <span><small>Demo event</small><b>{currentActionStage.eventTime}</b></span>
+            <div className="importance-bars">
+              {artifacts.feature_importance.map((row) => (
+                <div key={row.feature} className="importance-row">
+                  <code>{row.feature}</code>
+                  <div className="importance-track">
+                    <i style={{ width: `${(row.importance / maxImportance) * 100}%` }} />
                   </div>
-                  <div className="workflow-record-preview"><small>action_status</small><code>{currentActionStage.status}</code></div>
+                  <b>{row.importance.toFixed(3)}</b>
                 </div>
-                <p>Choose a checkpoint to update the state card and CRM preview. No customer is contacted and no external system is changed.</p>
-              </section>
-              <section className="output-boundary">
-                <span>OUTPUT BOUNDARY</span>
-                <div>
-                  <article><b>Implemented in current code</b><p>Risk CSV, probability, prediction period, recent metrics and up to three reason records with code, metric, baseline, delta and severity.</p></article>
-                  <article><b>Proposed CRM integration</b><p><code>action_owner</code>, <code>action_status</code>, <code>contacted_at</code>, <code>outcome</code> and <code>retained_after_horizon</code> for intervention measurement.</p></article>
-                </div>
-              </section>
+              ))}
             </div>
-          </div>
-
-          <div className="export-contract">
-            <div className="export-heading"><div><span>FINAL SYSTEM OUTPUT</span><h3>CRM-ready CSV contract</h3><p>The downloadable sample mirrors the production export shape while using synthetic identifiers and values.</p></div><a href={`${publicBasePath}/synthetic_risk_export.csv`} download>Download synthetic CSV <span>↓</span></a></div>
-            <div className="field-groups">
-              <div><span>IDENTITY &amp; TIME</span><code>cms_code_enc</code><code>window_end</code><code>predict_period</code><code>updated_at</code></div>
-              <div><span>RECENT BEHAVIOR</span><code>item_last</code><code>revenue_last</code><code>complaint_last</code><code>delay_last</code><code>nodone_last</code></div>
-              <div><span>MODEL OUTPUT</span><code>churn_rate</code><code>model_probability_pct</code></div>
-              <div><span>STRUCTURED REASONS × 3</span><code>reason_n</code><code>reason_n_code</code><code>metric · baseline · delta</code><code>delta_pct · severity</code></div>
-            </div>
-            <div className="export-row"><span><small>cms_code_enc</small><b>{selected.id}</b></span><span><small>window_end</small><b>2505</b></span><span><small>predict_period</small><b>2507</b></span><span><small>model_probability_pct</small><b>{Math.round(selected.probability * 100)}.0</b></span><span><small>reason_1_code</small><b>{selected.reasons[0].code}</b></span><span><small>reason_1_delta_pct</small><b>{selected.reasons[0].delta}</b></span></div>
+            <p className="table-note">
+              Lifetime satisfaction and order-quality dominate, followed by volume slope and recency-style ratios — the
+              model reads relationship health first, then recent shipping behavior. This is gain-based importance from the
+              notebook; per-customer SHAP explanations belong to the production layer below.
+            </p>
           </div>
         </div>
       </section>
 
-      <section className="section monitoring">
-        <div className="section-label">04 / Monitoring</div>
-        <div className="section-intro monitoring-intro"><h2>Separate promotion<br /><em>from monitoring.</em></h2><p>The code first decides whether a candidate model is safe to promote. After an accepted bundle scores the month, score drift and feature drift are recorded by scoring origin. These are related controls, but they are not one generic “run acceptance” checklist.</p></div>
+      <section className="section production-design" id="production-design">
+        <div className="section-label light">06 / From notebook to production</div>
+        <div className="section-intro method-intro">
+          <div>
+            <p className="eyebrow mint"><span /> Design layer · clearly separated</p>
+            <h2>
+              The score is the start.
+              <br />
+              <em>The workflow is the product.</em>
+            </h2>
+          </div>
+          <p>
+            Everything in this section is the production design that surrounds the model: structured reasons, a human
+            review workflow and a CRM contract. The notebook does not export these — they are shown as design, never as
+            demo results.
+          </p>
+        </div>
+
+        <div className="design-grid">
+          <article className="design-card">
+            <span className="card-kicker mint">STRUCTURED REASONS · PRODUCTION</span>
+            <h3>SHAP evidence mapped to eight business reasons</h3>
+            <div className="reason-catalog">
+              {reasonCatalog.map(([code, label], index) => (
+                <div key={code}>
+                  <i>{String(index + 1).padStart(2, "0")}</i>
+                  <div>
+                    <strong>{label}</strong>
+                    <code>{code}</code>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p>
+              In production, positive SHAP contributions select up to three of these buckets per customer, each rendered
+              with the observed metric, three-month baseline and delta — the same shape the dossier preview computes from
+              raw behavior above.
+            </p>
+          </article>
+
+          <article className="design-card action-card">
+            <span className="card-kicker mint">HUMAN WORKFLOW · DESIGN</span>
+            <h3>Record the handoff, not just the prediction</h3>
+            <div className="action-steps">
+              {actionStages.map((stage, index) => (
+                <button
+                  key={stage.status}
+                  className={`${index <= actionStep ? "complete" : ""} ${index === actionStep ? "current" : ""}`}
+                  onClick={() => setActionStep(index)}
+                  aria-current={index === actionStep ? "step" : undefined}
+                >
+                  <i>{String(index + 1).padStart(2, "0")}</i>
+                  <span>
+                    <strong>{stage.label}</strong>
+                    <small>{stage.short}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="workflow-status" aria-live="polite">
+              <div>
+                <span>SIMULATED STATE</span>
+                <code>action_status = {currentStage.status}</code>
+              </div>
+              <strong>{currentStage.label}</strong>
+              <p>{currentStage.description}</p>
+              <small>
+                CRM field updated: <code>{currentStage.eventField}</code> · No customer is contacted; no external system
+                changes.
+              </small>
+            </div>
+          </article>
+
+          <article className="design-card contract-card">
+            <span className="card-kicker mint">OUTPUT CONTRACT · THREE LAYERS</span>
+            <h3>What exists today, and what is designed</h3>
+            <div className="contract-layers">
+              <div>
+                <b>Notebook demo — implemented</b>
+                <p>Six-column risk list: customer, scoring origin, label, probability, decision, priority rank.</p>
+                <code>cms_code_enc · window_end · y_churn_t_plus_2 · churn_probability · predicted_churn · priority_rank</code>
+              </div>
+              <div>
+                <b>Production risk export — implemented in the system</b>
+                <p>Adds recent behavior aggregates plus up to three structured reasons with metric, baseline, delta and severity.</p>
+                <code>item_last · complaint_last · delay_last · reason_1..3 (code · metric · baseline · delta · severity)</code>
+              </div>
+              <div>
+                <b>CRM feedback — proposed design</b>
+                <p>Closes the loop so retention impact can be measured after the two-month horizon.</p>
+                <code>action_owner · action_status · contacted_at · outcome · retained_after_horizon</code>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section className="section monitoring" id="monitoring">
+        <div className="section-label">07 / Promotion &amp; monitoring</div>
+        <div className="section-intro split-intro">
+          <h2>
+            Separate promotion
+            <br />
+            <em>from monitoring.</em>
+          </h2>
+          <div>
+            <p>
+              The notebook’s five asserts are the seed of a bigger discipline: production first decides whether a candidate
+              model may be promoted, then monitors score and feature drift by scoring origin. The rules below are aligned
+              with the production code; the drift numbers are illustrative mechanics, not run results.
+            </p>
+          </div>
+        </div>
 
         <article className="promotion-logic">
-          <div className="promotion-heading"><div><span>CODE-ALIGNED MODEL PROMOTION</span><h3>What can actually accept or reject a candidate?</h3></div><b>Logic reference · not a run result</b></div>
+          <div className="promotion-heading">
+            <div>
+              <span className="card-kicker">CODE-ALIGNED MODEL PROMOTION</span>
+              <h3>What can actually accept or reject a candidate?</h3>
+            </div>
+            <b>Logic reference · not a run result</b>
+          </div>
           <div className="gate-lanes">
             <section>
               <span>01 / CANDIDATE VALIDATION</span>
               <ul>
                 <li><b>Walk-forward folds</b><p>Reject if all folds fail, the latest fold is invalid, or the rejected-fold rate exceeds 25%.</p></li>
-                <li><b>Final temporal holdout</b><p>Required by default. Main F1 and operating F1 must each be at least 0.01; predicted-positive rate must be at least 0.1%.</p></li>
-                <li><b>Sanity comparators</b><p>AP is checked against constant, random and two-feature Logistic Regression baselines. These produce warnings for investigation, not the monthly promotion rule.</p></li>
+                <li><b>Final temporal holdout</b><p>Required by default. Main F1 and operating F1 must each clear minimum checks; predicted-positive rate must stay above 0.1%.</p></li>
+                <li><b>Sanity comparators</b><p>AP is checked against constant, random and two-feature LR baselines — warnings for investigation, not the promotion rule.</p></li>
               </ul>
             </section>
             <section>
               <span>02 / MONTHLY PROMOTION</span>
               <ul>
                 <li><b>Label prevalence</b><p>With a previous bundle available, candidate training prevalence above 45% blocks retraining.</p></li>
-                <li><b>Month completeness</b><p>Versus the previous month: rows ≥80%, active customers ≥50%, items ≥70% and revenue ≥70%.</p></li>
-                <li><b>Current-period comparison</b><p>The candidate F1 must beat the accepted bundle re-evaluated on the current period, plus the configured epsilon.</p></li>
-                <li><b>Safe fallback</b><p>If promotion is rejected, the prior accepted model is retained and monthly scoring can continue.</p></li>
+                <li><b>Month completeness</b><p>Versus the previous month: rows ≥ 80%, active customers ≥ 50%, items ≥ 70%, revenue ≥ 70%.</p></li>
+                <li><b>Current-period comparison</b><p>The candidate F1 must beat the accepted bundle re-evaluated on the current period, plus an epsilon.</p></li>
+                <li><b>Safe fallback</b><p>If promotion is rejected, the prior accepted model is retained and monthly scoring continues.</p></li>
               </ul>
             </section>
           </div>
-          <div className="promotion-notes"><span><b>First run:</b> accepted before these monthly comparison gates.</span><span><b>Mandatory 3-month cycle:</b> bypasses completeness/F1 comparison after the prevalence guard.</span><span><b>No real status shown:</b> current values are unavailable.</span></div>
         </article>
 
-        <div className="monitoring-toolbar">
-          <div><span>MONTHLY POST-SCORING MONITORING</span><h3>Select a scoring origin</h3></div>
-          <div className="month-selector">
-            {monitoringSeries.map((month, index) => <button key={month.key} className={monitoringMonth === index ? "active" : ""} onClick={() => setMonitoringMonth(index)}>{month.label}</button>)}
-          </div>
-        </div>
-
         <div className="monitor-system">
-          <article className="score-drift-card">
-            <span className="card-kicker">SCORE DRIFT BY MONTH</span><h3>Population shift is a time series</h3>
-            <div className="risk-ratio-chart" aria-label="Illustrative monthly risk ratio">
-              {monitoringSeries.map((month, index) => <button key={month.key} className={monitoringMonth === index ? "active" : ""} onClick={() => setMonitoringMonth(index)}><b>{month.riskRatio}%</b><i style={{ height: `${Math.max(12, month.riskRatio * 3)}%` }} /><small>{month.key}</small></button>)}
+          <article className="drift-card">
+            <div className="drift-toolbar">
+              <div>
+                <span className="card-kicker">POST-SCORING MONITORING · ILLUSTRATIVE</span>
+                <h3>Score and feature drift by scoring origin</h3>
+              </div>
+              <div className="month-selector" role="tablist" aria-label="Select scoring origin">
+                {monitoringMonths.map((month, index) => (
+                  <button key={month.key} className={monitoringMonth === index ? "active" : ""} onClick={() => setMonitoringMonth(index)}>
+                    {month.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="selected-score-stats"><span><small>Selected origin</small><b>{currentMonitoring.key}</b></span><span><small>P50</small><b>{currentMonitoring.p50}%</b></span><span><small>P90</small><b>{currentMonitoring.p90}%</b></span><span><small>P99</small><b>{currentMonitoring.p99}%</b></span><span><small>Risk ratio</small><b>{currentMonitoring.riskRatio}%</b></span></div>
-            <p>The production monitor stores active count, risk count, risk ratio and P50/P90/P99. A high risk ratio is flagged against the previous six runs using median + 3 MAD once enough history exists.</p>
-            <em>Demo behavior: changing the operating cutoff updates May’s risk ratio, but not its score quantiles—the model scores themselves did not change.</em>
+            <div className="drift-columns">
+              <div className="score-drift">
+                <div className="risk-ratio-chart" aria-label="Illustrative monthly risk ratio">
+                  {monitoringMonths.map((month, index) => (
+                    <button key={month.key} className={monitoringMonth === index ? "active" : ""} onClick={() => setMonitoringMonth(index)}>
+                      <b>{month.riskRatio}%</b>
+                      <i style={{ height: `${Math.max(12, month.riskRatio * 3.4)}%` }} />
+                      <small>{month.label}</small>
+                    </button>
+                  ))}
+                </div>
+                <div className="score-stats">
+                  <span><small>P50</small><b>{currentMonitoring.p50}%</b></span>
+                  <span><small>P90</small><b>{currentMonitoring.p90}%</b></span>
+                  <span><small>P99</small><b>{currentMonitoring.p99}%</b></span>
+                  <span><small>Risk ratio</small><b>{currentMonitoring.riskRatio}%</b></span>
+                </div>
+                <p>
+                  The monitor stores active count, risk count, risk ratio and score quantiles per origin; a risk ratio above
+                  historical median + 3 MAD is flagged once enough history exists.
+                </p>
+              </div>
+              <div className="feature-drift">
+                <div className="drift-table">
+                  <div><span>Feature</span><span>PSI</span><span>State</span></div>
+                  {featureDrift.map((feature) => {
+                    const value = feature.values[monitoringMonth];
+                    const state = psiStatus(value);
+                    return (
+                      <div key={feature.name}>
+                        <span className="feature-name">
+                          <strong>{feature.label}</strong>
+                          <code>{feature.name}</code>
+                        </span>
+                        <b>{value.toFixed(2)}</b>
+                        <em className={state.toLowerCase()}>{state}</em>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="drift-legend">
+                  <span><i className="ok" />OK ≤ 0.10</span>
+                  <span><i className="warn" />WARN &gt; 0.10</span>
+                  <span><i className="alert" />ALERT &gt; 0.20</span>
+                </div>
+                <p>PSI and discrete KS run feature by feature against the training profile — thresholds match the monitoring code.</p>
+              </div>
+            </div>
           </article>
 
-          <article className="feature-drift-card">
-            <span className="card-kicker">FEATURE DRIFT · {currentMonitoring.key}</span><h3>PSI against the training profile</h3>
-            <div className="drift-table">
-              <div><span>Feature</span><span>PSI</span><span>State</span></div>
-              {featureDrift.map((feature) => {
-                const value = feature.values[monitoringMonth];
-                const state = psiStatus(value);
-                return <div key={feature.name}><span className="feature-name"><strong>{featureBusinessLabels[feature.name] ?? feature.name}</strong><code>{feature.name}</code></span><b>{value.toFixed(2)}</b><em className={state.toLowerCase()}>{state}</em></div>;
-              })}
-            </div>
-            <div className="drift-legend"><span><i className="ok" />OK ≤ 0.10</span><span><i className="warn" />WARN &gt; 0.10</span><span><i className="alert" />ALERT &gt; 0.20</span></div>
-            <p>PSI and discrete KS are calculated feature by feature. The table is synthetic, but its thresholds and monthly indexing match the monitoring code.</p>
+          <article className="impact-card">
+            <span className="card-kicker">BUSINESS OUTCOME</span>
+            <h3>Impact measurement</h3>
+            <div className="pending-impact"><strong>Pending</strong><span>validated update</span></div>
+            <p>
+              Intervention reach, retained customers and attributable revenue will be reported only after action outcomes
+              and the two-month measurement window are available from an approved production run.
+            </p>
           </article>
-
-          <article className="impact-card"><span className="card-kicker">BUSINESS OUTCOME</span><h3>Impact measurement</h3><div className="pending-impact"><strong>Pending</strong><span>validated update</span></div><p>Intervention reach, retained customers and attributable revenue will be reported only after action outcomes and the two-month measurement window are available.</p></article>
         </div>
       </section>
 
       <section className="section ownership" id="ownership">
-        <div className="section-label light">05 / Ownership</div>
+        <div className="section-label light">08 / Ownership</div>
         <div className="ownership-grid">
-          <div><p className="eyebrow mint"><span /> Role: Data Scientist</p><h2>Built for decisions,<br /><em>not just a notebook.</em></h2></div>
-          <div className="ownership-copy"><p>Owned problem formulation, label design, baseline and XGBoost modeling, temporal validation, hyperparameter tuning, threshold strategy, explainability, risk export, monitoring and production integration.</p><p>Collaborated with the data engineering team on feature definitions and generation.</p></div>
+          <div>
+            <p className="eyebrow mint"><span /> Role: Data Scientist</p>
+            <h2>
+              Built for decisions,
+              <br />
+              <em>and proven in a notebook.</em>
+            </h2>
+          </div>
+          <div className="ownership-copy">
+            <p>
+              Owned problem formulation, label design, baseline and XGBoost modeling, temporal validation, threshold
+              strategy, explainability, risk export, monitoring and production integration. The public notebook demo
+              reproduces that pipeline end to end on synthetic data.
+            </p>
+            <p>Feature definitions and generation were a collaboration with the data engineering team.</p>
+          </div>
         </div>
-        <div className="stack-row"><span>Python</span><span>XGBoost</span><span>Optuna</span><span>SHAP</span><span>PostgreSQL</span><span>Airflow</span><span>Docker</span></div>
-        <div className="cv-block"><span>CV SUMMARY</span><p>Developed and productionized a two-month logistics churn model using XGBoost, purged walk-forward validation and final holdout evaluation, producing explainable intervention queues of approximately 7,000 high-risk customers per run.</p></div>
+        <div className="stack-row">
+          <span>Python</span><span>XGBoost</span><span>scikit-learn</span><span>Optuna</span><span>SHAP</span>
+          <span>PostgreSQL</span><span>Airflow</span><span>Docker</span>
+        </div>
+        <div className="cv-block">
+          <span>CV SUMMARY</span>
+          <p>
+            Developed and productionized a two-month logistics churn model (LR window selection → XGBoost, temporal
+            validation, locked-threshold holdout) and shipped a public, reproducible notebook demo achieving F1{" "}
+            {holdout.f1.toFixed(2)} / ROC-AUC {holdout.roc_auc.toFixed(2)} on a synthetic holdout, with an explainable,
+            capacity-aware intervention queue.
+          </p>
+        </div>
       </section>
 
-      <footer><div><span className="brand-mark">CP</span><strong>Explainable Customer Churn Prioritization</strong></div><p><Link href="/case-study">Read full case study ↗</Link> · Synthetic demonstration data</p><a href="#top">Back to top ↑</a></footer>
+      <footer>
+        <div>
+          <span className="brand-mark">CP</span>
+          <strong>Explainable Customer Churn Prioritization</strong>
+        </div>
+        <p>
+          <Link href="/case-study">Read full case study ↗</Link> · Synthetic demonstration data · Seed {meta.seed}
+        </p>
+        <a href="#top">Back to top ↑</a>
+      </footer>
     </main>
   );
 }

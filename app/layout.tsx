@@ -9,7 +9,7 @@ const siteOrigin = process.env.GITHUB_PAGES === "true"
 export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin),
   title: "Explainable Customer Churn Prioritization | Data Science Case Study",
-  description: "A production-oriented logistics churn system that predicts risk two months ahead and produces an explainable intervention queue.",
+  description: "A logistics churn system that predicts risk two months ahead and produces an explainable intervention queue — demonstrated end to end by a reproducible notebook on synthetic data.",
   openGraph: {
     title: "Explainable Customer Churn Prioritization",
     description: "Logistics · 2-month horizon · Actionable risk queue",
