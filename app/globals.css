@@ -501,10 +501,15 @@ code { font-family: "JetBrains Mono", Consolas, "Courier New", monospace; font-s
 .impact-card { background: var(--navy); color: white; padding: 30px 32px; display: grid; align-content: start; gap: 4px; }
 .impact-card .card-kicker { color: var(--mint); }
 .impact-card h3 { margin: 10px 0 18px; font-family: Georgia, serif; font-size: 23px; font-weight: 400; }
-.pending-impact { border: 1px dashed rgba(255, 255, 255, 0.35); padding: 22px; text-align: center; margin-bottom: 18px; }
-.pending-impact strong { display: block; font-family: Georgia, serif; font-size: 30px; font-weight: 400; color: var(--mint); }
-.pending-impact span { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted-dark); }
+.impact-hero { border: 1px solid rgba(160, 255, 189, 0.42); background: rgba(160, 255, 189, 0.06); padding: 22px; margin-bottom: 12px; }
+.impact-hero strong { display: block; font-family: Georgia, serif; font-size: clamp(34px, 4vw, 48px); font-weight: 400; color: var(--mint); line-height: 1; }
+.impact-hero span { display: block; margin-top: 9px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #b9c6d2; }
+.impact-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.impact-metrics div { border: 1px solid rgba(255, 255, 255, 0.16); padding: 12px 10px; }
+.impact-metrics b { display: block; color: white; font-size: 18px; font-variant-numeric: tabular-nums; }
+.impact-metrics span { display: block; margin-top: 4px; color: #9fb0c0; font-size: 11px; line-height: 1.35; text-transform: uppercase; letter-spacing: 0.05em; }
 .impact-card p { margin: 0; font-size: 14.5px; color: #b9c6d2; line-height: 1.7; }
+.impact-disclaimer { display: block; margin-top: 14px; padding-top: 13px; border-top: 1px solid rgba(255, 255, 255, 0.14); color: #8fa4b7; font-size: 12px; line-height: 1.55; }
 
 /* ---------- Ownership ---------- */
 .ownership-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6vw; padding: 54px 0 40px; align-items: start; }
@@ -647,6 +652,10 @@ footer > a { font-weight: 750; }
 .direct-answer span { font-size: 12.5px; font-weight: 800; letter-spacing: 0.12em; color: #52616e; text-transform: uppercase; }
 .direct-answer strong { display: block; margin: 10px 0 8px; font-family: Georgia, serif; font-size: 19px; font-weight: 400; }
 .direct-answer p { margin: 0; font-size: 15px; color: var(--muted); line-height: 1.7; }
+.direct-answer > code { display: block; margin: 12px 0; color: var(--ink); font-size: 14px; line-height: 1.65; white-space: normal; }
+.priority-score-rule { margin-bottom: 18px; border-left: 4px solid var(--mint-strong); }
+.business-scenario-case { border-color: rgba(95, 174, 119, 0.45); background: rgba(169, 230, 173, 0.18); }
+.business-scenario-case strong { color: #21563a; font-size: 25px; }
 
 .formula-block { background: var(--cream); border: 1px solid var(--line); padding: 22px 26px; margin: 18px 0; }
 .formula-block code { display: block; font-size: 15.5px; color: var(--ink); line-height: 1.7; white-space: pre-wrap; }

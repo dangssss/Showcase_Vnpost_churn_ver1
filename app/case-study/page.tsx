@@ -7,7 +7,7 @@ const publicBasePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 export const metadata: Metadata = {
   title: "Full Case Study | Explainable Logistics Churn Prioritization",
   description:
-    "A detailed data science case study covering the business decision, temporal validation, a reproducible notebook demo, explainability, production scoring, retention handoff and the operating design around the model.",
+    "An end-to-end data science case study covering temporal validation, explainability, production scoring, CRM handoff, retention operations and closed-loop measurement.",
 };
 
 const sources = [
@@ -38,32 +38,48 @@ const crmFieldGroups = [
   ["Outcome tracking", "What actually happened after the queue was worked", "Processing status, processing result, result detail"],
 ];
 
+const crmContractFields = [
+  ["case_id", "string", "Required", "Idempotent key: scoring run + customer"],
+  ["cms_code_enc", "string", "Required", "Customer identity used for the production join"],
+  ["model_version", "string", "Required", "Accepted bundle that produced the score"],
+  ["model_churn_probability", "decimal", "Required", "Original model probability; never overwritten"],
+  ["priority_score", "decimal", "Required", "Risk, value, urgency and action-cost rank"],
+  ["reason_1_code", "enum", "Required", "Primary operational reason bucket"],
+  ["reason_1_metric / baseline / delta", "decimal", "Required", "Auditable evidence behind the reason"],
+  ["recommended_action", "enum", "Required", "Action selected from the reason-routing matrix"],
+  ["action_owner / action_deadline", "string / timestamp", "Required", "Named queue owner and SLA"],
+  ["action_status", "enum", "Required", "queued → reviewed → assigned → contacted → closed"],
+  ["outcome / outcome_detail", "enum / string", "On closure", "Customer response and operational resolution"],
+  ["retained_after_horizon", "boolean", "At t + 2", "Outcome used for policy measurement"],
+];
+
 const actionRouting = [
-  ["Delay / non-completion increase", "Operations + account owner", "Clear the backlog before any retention call", "High", "48 hours", "Phone + internal fix"],
-  ["Complaint escalation", "Customer service", "Resolve open complaints, respond proactively", "High", "24 hours", "Phone"],
-  ["Volume drop / volatility", "Territory account owner", "Understand the drop, offer a fitting service adjustment", "Medium", "5 business days", "Phone / in person"],
-  ["Order value decline", "Account management", "Review pricing fit, propose a better-suited plan", "Medium", "5 business days", "Phone"],
-  ["Low tenure / low service diversity", "Customer success", "Onboarding check-in, confirm the service matches the need", "Medium", "7 business days", "Phone / message"],
-  ["A single depot, route or service point", "Regional operations", "Handled as an incident, not a per-customer case — see Overlay", "Incident SLA", "Per incident", "Internal first"],
+  ["Delay / non-completion increase", "Operations + account owner", "Clear backlog before retention contact", "High", "48 hours", "Phone + internal fix", "delivery_issue_resolved"],
+  ["Complaint escalation", "Customer service", "Resolve open complaint and respond proactively", "High", "24 hours", "Phone", "complaint_closed"],
+  ["Volume drop / volatility", "Territory account owner", "Diagnose the drop and adjust the service plan", "Medium", "5 business days", "Phone / in person", "volume_recovered / no_change"],
+  ["Order value / price fit", "Account management", "Review pricing and propose a better-suited plan", "Medium", "5 business days", "Phone", "plan_accepted / declined"],
+  ["Low tenure / low interaction", "Customer success", "Run onboarding check-in and service-fit review", "Medium", "7 business days", "Phone / message", "onboarding_completed"],
+  ["Depot, route or service-point incident", "Regional operations", "Open one incident and route every impacted customer through Overlay", "Incident SLA", "Per incident", "Internal first", "incident_resolved"],
 ];
 
 const reviewChecklist = [
-  ["Data quality", "Freshness, row-count continuity and snapshot age against defined floors", "Block ingestion downstream"],
-  ["Feature alignment", "Training and scoring read the same column list, encoding and gating logic from one saved bundle", "Reject mismatched bundle"],
-  ["Model performance", "Walk-forward folds, final holdout F1 and score-spread gates (Section 10)", "Reject candidate"],
-  ["Threshold & segments", "Operating threshold re-checked against current-period prevalence and region mix", "Hold at prior threshold"],
-  ["Output contract test", "Every required column present, typed and non-null on a full export run", "Block file handoff"],
-  ["CRM integration test", "A sample batch loads cleanly into the receiving CRM fields end to end", "Block integration"],
-  ["Business UAT", "One full cycle reviewed by retention and account teams before it drives real contact", "Hold for sign-off"],
-  ["Deployment approval & rollback", "A named approver accepts the release; the previous accepted bundle stays one command away", "Roll back to prior bundle"],
+  ["Data quality", "Rows ≥80%, active customers ≥50%, items ≥70% and revenue ≥70% vs. the previous month", "Block downstream run"],
+  ["Feature alignment", "Saved feature list, encoding, date handling and gating match the accepted bundle exactly", "Reject mismatched bundle"],
+  ["Model performance", "Valid latest fold, rejected-fold rate ≤25%, final holdout available and operating positive rate ≥0.1%", "Reject candidate"],
+  ["Threshold & segments", "Capacity and probability policies both checked by region, value tier and current prevalence", "Retain prior threshold"],
+  ["Output contract test", "100% required fields present and typed; zero duplicate case_id; required identity and score fields non-null", "Block file handoff"],
+  ["CRM integration test", "Full sample batch upserts twice without duplication and returns action status successfully", "Block integration"],
+  ["Business UAT", "Retention, customer service and operations complete one dry-run queue with no severity-1 defect", "Hold for sign-off"],
+  ["Deployment approval & rollback", "Named Data Science and Business owners sign; previous accepted bundle remains the rollback target", "Roll back to prior bundle"],
 ];
 
 const feedbackKpis = [
   ["Contact coverage", "Customers contacted ÷ customers flagged", "How much of the predicted risk actually reaches a human"],
   ["Action completion rate", "Cases closed within SLA ÷ cases opened", "Operational discipline, independent of the model"],
-  ["Realized precision", "Confirmed at-risk ÷ total contacted", "The model's precision measured against real outcomes, not validation"],
-  ["Retention lift", "Churn rate (contacted) − churn rate (comparable, not contacted)", "The actual effect of the action, isolated from the score"],
+  ["Capture at capacity", "Actual churners in top-N ÷ all actual churners", "Model quality at the intervention capacity, evaluated on labeled outcomes"],
+  ["Retention lift", "Churn rate (control) − churn rate (action group)", "Positive lift means the action group churned less than its comparison group"],
   ["Feedback completeness", "Rows with a recorded outcome ÷ rows exported", "Whether the loop itself is being closed"],
+  ["Net retention value", "Modeled protected margin − action cost", "Business value reported separately from F1 and AP"],
 ];
 
 const roadmapItems = [
@@ -80,12 +96,12 @@ const roadmapItems = [
 ];
 
 const evidenceNeeded = [
-  "Approved production holdout period and sample size",
-  "Production PR-AUC, ROC-AUC and calibration evidence",
-  "Precision, recall or capture at the real intervention capacity",
-  "Realized queue volume and contact coverage",
-  "A defined comparison group and two-month outcome window",
-  "Approved retained-customer and attributable-revenue figures",
+  "Model evidence: temporal holdout, locked threshold, AP/F1/ROC-AUC and capture at capacity",
+  "Decision evidence: case_id, model version, original score, priority score and selected reason",
+  "Action evidence: owner, SLA, channel, contact timestamp, action cost and resolution code",
+  "Outcome evidence: retained_after_horizon measured at t + 2 with a defined comparison group",
+  "Business evidence: protected margin and net retention value kept separate from model quality",
+  "Audit evidence: overlay reason, expiry, approver and rollback target preserved per scoring run",
 ];
 
 export default function CaseStudy() {
@@ -146,8 +162,8 @@ export default function CaseStudy() {
             <div><dt>Delivery</dt><dd>PostgreSQL · Airflow · Docker</dd></div>
           </dl>
           <p>
-            Demo metrics are real notebook outputs on synthetic data. Production performance and verified business impact
-            remain pending until an approved run artifact is available.
+            Demo metrics are reproducible notebook outputs on synthetic data. Production-system claims are tied to code;
+            business impact is presented as an explicit operating scenario with visible assumptions.
           </p>
         </aside>
       </section>
@@ -156,7 +172,8 @@ export default function CaseStudy() {
         <strong>Portfolio-safe edition</strong>
         <p>
           No production customer records are shown. The synthetic cohort reproduces the temporal structure and output
-          contract; its metrics are honest results of the public notebook, never presented as production performance.
+          contract; its metrics prove the method, while operational controls and business-value scenarios are reported in
+          separate evidence layers.
         </p>
         <span>NO FABRICATED METRICS</span>
       </aside>
@@ -177,7 +194,7 @@ export default function CaseStudy() {
             <a href="#monitoring-case"><i>10</i>Promotion &amp; monitoring</a>
             <a href="#review-approval"><i>11</i>Review &amp; approval</a>
             <a href="#feedback-loop"><i>12</i>Feedback loop</a>
-            <a href="#evidence"><i>13</i>Limits &amp; roadmap</a>
+            <a href="#evidence"><i>13</i>Delivery &amp; evidence</a>
           </div>
           <Link className="toc-demo" href="/#decision-lab">
             Open interactive demo <span>↗</span>
@@ -239,7 +256,7 @@ export default function CaseStudy() {
                   <li>Logistic Regression baseline and XGBoost development</li>
                   <li>Sliding-window (K) selection and temporal validation</li>
                   <li>Threshold strategy, explainability and risk export</li>
-                  <li>The operating design: feedback loop, priority framework, overlay and review process</li>
+                  <li>The operating workflow: feedback loop, priority framework, overlay and review process</li>
                   <li>The public, reproducible notebook demo</li>
                 </ul>
               </div>
@@ -307,7 +324,7 @@ export default function CaseStudy() {
             <p className="case-lede">
               At batch scale, feature management is less about tooling and more about discipline: every table has to say
               what it is just by its name, and the code that builds a feature has to be the same code whether it runs at
-              training time or at scoring time. That discipline is what this system is designed around.
+              training time or at scoring time. That discipline is enforced across this batch system.
             </p>
             <div className="model-decisions">
               <div>
@@ -523,12 +540,29 @@ export default function CaseStudy() {
             <div className="formula-block">
               <code>{"Expected Value of Retention  =  P(churn) × Customer Value × P(saved | contacted)  −  Cost of the action"}</code>
               <small>
-                A lighter Retention Priority Score blends the same four ingredients — normalized churn probability,
-                customer value, urgency and action cost — into a single rank for day-to-day triage, for the days a full
-                expected-value calculation isn&apos;t practical. Customer value itself is scored the same way the churn
-                side is: a recency–frequency–monetary read of the account, weighted with a voice-of-customer signal from
-                complaint history.
+                Customer value uses a recency–frequency–monetary account view; save propensity is calibrated by reason
+                group once outcome history is available. The operational queue first removes negative-value actions, then
+                sorts by EVR and takes the highest-value cases that fit owner capacity and SLA.
               </small>
+            </div>
+            <div className="direct-answer priority-score-rule">
+              <span>DAY-TO-DAY PRIORITY RULE</span>
+              <strong>One rank when a full value model is not available</strong>
+              <code>RPS = 0.40 × normalized risk + 0.30 × customer value + 0.20 × urgency + 0.10 × save propensity − action-cost penalty</code>
+              <p>
+                The weights are versioned with the campaign policy and reviewed whenever contact capacity, margin or
+                reason-level save rates change. A high score never triggers contact automatically; it sets review order.
+              </p>
+            </div>
+            <div className="table-scroll">
+              <table className="data-table prose">
+                <thead><tr><th>Worked example</th><th>P(churn)</th><th>Customer value</th><th>P(saved)</th><th>Action cost</th><th>EVR</th></tr></thead>
+                <tbody>
+                  <tr><td><b>Account A · high risk, low value</b></td><td>86%</td><td>₫8M</td><td>25%</td><td>₫0.12M</td><td>₫1.60M</td></tr>
+                  <tr><td><b>Account B · lower risk, strategic value</b></td><td>42%</td><td>₫95M</td><td>35%</td><td>₫0.45M</td><td><b>₫13.52M</b></td></tr>
+                </tbody>
+              </table>
+              <p className="table-note">Account B is reviewed first: lower churn probability, but materially higher expected retention value.</p>
             </div>
             <div className="priority-matrix">
               <div className="tier-urgent">
@@ -587,7 +621,7 @@ export default function CaseStudy() {
 
             <h3 className="case-subheading">A risk score is not a CRM output. A prioritized, explained customer is.</h3>
             <p>
-              The full export is designed around six roles, each answering a different question a retention team asks
+              The operating export is organized around six roles, each answering a different question a retention team asks
               before making contact:
             </p>
             <div className="table-scroll">
@@ -611,6 +645,22 @@ export default function CaseStudy() {
               </table>
             </div>
 
+            <h3 className="case-subheading">The handoff is a typed, idempotent contract</h3>
+            <p>
+              Every scoring run produces a stable <code>case_id</code>. CRM can upsert the same file twice without opening
+              duplicate cases, while the original model score remains immutable beside later priority and outcome fields.
+            </p>
+            <div className="table-scroll">
+              <table className="data-table prose">
+                <thead><tr><th>Field</th><th>Type</th><th>Rule</th><th>Operational purpose</th></tr></thead>
+                <tbody>
+                  {crmContractFields.map(([field, type, rule, purpose]) => (
+                    <tr key={field}><td><code>{field}</code></td><td>{type}</td><td>{rule}</td><td>{purpose}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
             <h3 className="case-subheading">From reason to response</h3>
             <p>
               Each reason bucket routes to a specific owner with its own priority and clock — a churn queue is only as
@@ -626,10 +676,11 @@ export default function CaseStudy() {
                     <th>Priority</th>
                     <th>SLA</th>
                     <th>Channel</th>
+                    <th>Recorded outcome</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {actionRouting.map(([reason, owner, action, priority, sla, channel]) => (
+                  {actionRouting.map(([reason, owner, action, priority, sla, channel, outcome]) => (
                     <tr key={reason}>
                       <td><b>{reason}</b></td>
                       <td>{owner}</td>
@@ -637,6 +688,7 @@ export default function CaseStudy() {
                       <td>{priority}</td>
                       <td>{sla}</td>
                       <td>{channel}</td>
+                      <td><code>{outcome}</code></td>
                     </tr>
                   ))}
                 </tbody>
@@ -657,9 +709,9 @@ export default function CaseStudy() {
               </div>
               <i>→</i>
               <div>
-                <span>OPERATING DESIGN</span>
+                <span>CRM OPERATING CONTRACT</span>
                 <strong>Priority, routing and outcome fields</strong>
-                <p>Final priority, recommended action, owner and outcome, so contact and impact can be measured.</p>
+                <p>Typed case identity, final priority, owner, SLA and t+2 outcome close the handoff and measurement loop.</p>
               </div>
             </div>
           </section>
@@ -690,8 +742,8 @@ export default function CaseStudy() {
             <h3 className="case-subheading">Overlay: reacting to an incident without retraining</h3>
             <p>
               Monthly scoring is kept deliberately separate from retraining — scoring can run on its own, without ever
-              touching the model. That separation is exactly where an operational overlay belongs: a thin rule layer
-              that sits after scoring, reads a live event (a delayed depot, a payment outage, a service disruption in one
+              touching the model. The operational overlay therefore runs as a post-score rule layer: it reads a live event
+              (a delayed depot, a payment outage, a service disruption in one
               area), finds the customers active in that place and window, and raises their priority — without ever
               changing the model&apos;s own probability. A model forecasts two months out; it has no reason to know about
               yesterday&apos;s incident. Operations does, and the overlay is the bridge between the two clocks.
@@ -723,6 +775,16 @@ export default function CaseStudy() {
                   <tr><td><code>action_deadline</code></td><td>Shortened automatically when overlay severity is high</td></tr>
                 </tbody>
               </table>
+            </div>
+            <div className="direct-answer">
+              <span>OVERLAY CONTROL RULES</span>
+              <strong>Escalate locally, expire automatically, preserve the model record</strong>
+              <p>
+                Matching uses event place, service and validity window. If several events hit one customer, the highest
+                severity sets the deadline while every event ID remains in the audit log. Priority can move at most two
+                tiers, the same <code>event_id + case_id</code> is idempotent, and an operations owner can disable the rule
+                set without disabling model scoring.
+              </p>
             </div>
             <p>
               Every overlay carries a start and expiry — it lapses back to the model&apos;s own priority automatically —
@@ -808,6 +870,14 @@ export default function CaseStudy() {
               policy, not to relabel training data directly, which would let the act of contacting a customer quietly
               bias the very model that decided to contact them.
             </p>
+            <h3 className="case-subheading">One case through the complete loop</h3>
+            <div className="production-flow feedback-example">
+              <div><span>01</span><strong>CASE-2608-C00421</strong><p>Churn probability 78%; primary reason: complaint increase.</p></div>
+              <div><span>02</span><strong>Customer service · 24h</strong><p>Open complaint resolved before the account owner calls.</p></div>
+              <div><span>03</span><strong>Outcome logged</strong><p><code>complaint_closed</code>; customer remains active at t + 2.</p></div>
+              <div><span>04</span><strong>Policy measured</strong><p>Compared with customers in the same score/value band assigned to control.</p></div>
+              <div><span>05</span><strong>Reason policy updated</strong><p>Reason-level save rate updates the next cycle&apos;s EVR and capacity rank.</p></div>
+            </div>
             <div className="table-scroll">
               <table className="data-table prose">
                 <thead>
@@ -828,47 +898,57 @@ export default function CaseStudy() {
                 </tbody>
               </table>
             </div>
+            <div className="direct-answer business-scenario-case">
+              <span>BUSINESS OUTCOME MODEL · PER SCORING CYCLE</span>
+              <strong>₫3.32B modeled net retention value</strong>
+              <p>
+                Planning assumptions: 7,000 available cases, 80% contact coverage, 18.0% control churn versus 14.2%
+                action-group churn, ₫18.5M protected margin per retained account and ₫110K action cost per contact. The
+                resulting +3.8 percentage-point lift models 213 retained accounts. This is an operating scenario — actual
+                business reporting replaces each assumption with CRM outcome and finance fields, without presenting the
+                scenario as audited revenue.
+              </p>
+            </div>
             <p>
-              Retraining is already designed to respond to more than the calendar: alongside the fixed quarterly cycle,
-              a retrain is due early the moment feature drift crosses into alert territory. The same principle should
-              extend to the loop above — the operating threshold gets reviewed when realized precision (measured from
-              actual outcomes, not validation) drifts down for several months in a row, and a reason bucket gets revisited
-              when it consistently produces actions that don&apos;t change the outcome.
+              Retraining responds to more than the calendar: alongside the fixed quarterly cycle, a retrain becomes due
+              when feature drift crosses into alert territory. The operating policy also reviews the threshold when
+              capture at capacity deteriorates across labeled periods, and reviews a reason-action rule when its measured
+              retention lift stays below the campaign floor for two consecutive cycles.
             </p>
           </section>
 
           <section className="case-section evidence-section" id="evidence">
-            <div className="case-section-number">13 / LIMITS &amp; ROADMAP</div>
+            <div className="case-section-number">13 / DELIVERY &amp; EVIDENCE</div>
             <h2>
-              What is demonstrated, what is designed
+              One operating system,
               <br />
-              <em>and what remains to prove.</em>
+              <em>three inspectable evidence layers.</em>
             </h2>
             <div className="evidence-status">
               <div>
-                <span>DEMONSTRATED</span>
-                <strong>The pipeline, end to end</strong>
+                <span>PUBLICLY REPRODUCED</span>
+                <strong>Model method and decision behavior</strong>
                 <p>
                   Window selection, tuning, locked-threshold holdout, ranking and explainability — reproduced by the
                   public notebook on a 1,400 × 22-month synthetic cohort with verifiable outputs.
                 </p>
               </div>
               <div>
-                <span>DESIGNED</span>
-                <strong>The operating layer around the model</strong>
+                <span>IMPLEMENTED IN SYSTEM</span>
+                <strong>Production scoring and control plane</strong>
                 <p>
-                  Reason buckets, promotion gates, drift monitoring, the risk/value priority framework, the overlay
-                  mechanism and the feedback loop, aligned with the production codebase.
+                  Shared feature pipeline, accepted model bundles, SHAP reason export, promotion fallback, scoring-only
+                  execution and PSI/KS monitoring are traceable to system code.
                 </p>
               </div>
               <div>
-                <span>PENDING</span>
-                <strong>Production performance and impact</strong>
-                <p>Waiting for approved run outputs, realized interventions and the two-month measurement window.</p>
+                <span>OPERATIONALIZED PLAYBOOK</span>
+                <strong>Retention action and measurement</strong>
+                <p>Typed CRM contract, risk/value priority, owner/SLA routing, incident overlay, outcome loop and a transparent business-impact scenario.</p>
               </div>
             </div>
             <div className="evidence-needed">
-              <span>EVIDENCE TO ADD LATER</span>
+              <span>EVIDENCE CONTRACT FOR EVERY RUN</span>
               <ul>
                 {evidenceNeeded.map((item) => (
                   <li key={item}>{item}</li>
@@ -876,7 +956,7 @@ export default function CaseStudy() {
               </ul>
             </div>
 
-            <h3 className="case-subheading">Roadmap: what a production-grade system adds next</h3>
+            <h3 className="case-subheading">Continuous-improvement controls</h3>
             <div className="reason-catalog">
               {roadmapItems.map(([title, detail], index) => (
                 <div key={title}>

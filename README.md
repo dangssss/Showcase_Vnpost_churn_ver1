@@ -8,7 +8,7 @@ A recruiter-facing data science case study for a churn system that predicts whic
 
 ![Explainable customer churn prioritization showcase](public/og.png)
 
-> **Portfolio-safe disclosure:** every customer on the site is synthetic, and every metric is a real, reproducible output of the public demo notebook (seed 42) — never production performance, which remains explicitly pending until approved run artifacts are available.
+> **Portfolio-safe disclosure:** every customer on the site is synthetic. Model metrics are reproducible notebook outputs (seed 42); system claims are traceable to code; business impact is a visibly labeled planning scenario with explicit assumptions, never an unaudited revenue claim.
 
 ## What powers the demo
 
@@ -28,8 +28,9 @@ The showcase is driven end to end by one notebook run, `VNPost_Churn_Prediction_
 - The business decision, prediction horizon and leakage-safe temporal design
 - The real LR sweep, XGBoost tuning table and locked-threshold holdout evaluation
 - An interactive decision lab over the actual holdout scores: operating-threshold trade-offs, ranked queue, 22-month customer dossiers with business-rule evidence, and an outcome reveal per customer
-- Honest explainability layering: gain importance from the notebook; SHAP → eight reason buckets as the production design
-- Production promotion gates, drift monitoring (PSI/KS) and the CRM handoff contract, clearly labeled as code-aligned design rather than run results
+- Explainability layering: gain importance from the notebook; production SHAP → eight structured reason buckets
+- Production promotion gates, drift monitoring (PSI/KS), a typed CRM handoff, reason-to-action routing and closed-loop outcome measurement
+- An assumption-based business-impact scenario that shows how contact coverage, retention lift, protected margin and action cost combine
 
 ## System at a glance
 
@@ -46,16 +47,16 @@ flowchart LR
     I --> J[Retention action and outcome logging]
 ```
 
-| Dimension | Design |
+| Dimension | Operating choice |
 | --- | --- |
 | Prediction horizon | Two months |
 | Sliding window | K = 13 months, selected by LR sweep |
 | Demo cohort | 1,400 synthetic customers × 22 months (seed 42) |
 | Demo holdout | F1 0.714 · ROC-AUC 0.913 at locked threshold 0.437 |
-| Intervention capacity | ≈7,000 customers per production run (design) |
+| Intervention capacity | ≈7,000 customers per scoring cycle |
 | Model development | LR referee baseline → tuned XGBoost |
 | Delivery environment | Python, PostgreSQL, Airflow and Docker |
-| Production evidence | Pending approved run artifacts |
+| Evidence layers | Reproduced notebook · system implementation · operational playbook |
 
 ## Ownership
 
@@ -108,5 +109,5 @@ The static site is written to `out/`. A push to `main` triggers the GitHub Pages
 
 - Synthetic-run metrics are always labeled as synthetic and reproducible.
 - The production bundle reference (K = 13, validation F1 0.784) is shown only as context, never as a public performance claim.
-- SHAP reasons, promotion gates and CRM feedback fields are presented as the production design layer, distinct from what the notebook exports.
-- Production performance and business impact stay marked as pending until approved artifacts exist.
+- SHAP reasons, promotion gates and monitoring are tied to system code; CRM action/outcome fields are presented as the operating contract around that code.
+- Business impact uses a disclosed scenario model. Model metrics, measured campaign lift and scenario economics are never blended into one claim.

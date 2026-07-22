@@ -56,7 +56,13 @@ Ranking a queue by churn probability alone creates a bad incentive: a small acco
 Expected Value of Retention = P(churn) × Customer Value × P(saved | contacted) − Cost of the action
 ```
 
-A lighter Retention Priority Score blends the same four ingredients — normalized churn probability, customer value, urgency and action cost — into a single rank for day-to-day triage. Customer value is scored the same way churn risk is: a recency–frequency–monetary read of the account, weighted with a voice-of-customer signal from complaint history.
+A lighter Retention Priority Score supports day-to-day triage when a full value model is unavailable:
+
+```
+RPS = 0.40 × normalized risk + 0.30 × customer value + 0.20 × urgency + 0.10 × save propensity − action-cost penalty
+```
+
+The operational queue removes negative-value actions, ranks the remainder by EVR and takes the highest-value cases that fit owner capacity and SLA. For example, an account at 86% churn risk with ₫8M value, 25% save propensity and ₫0.12M action cost has EVR ₫1.60M; a strategic account at only 42% risk but ₫95M value, 35% save propensity and ₫0.45M action cost has EVR ₫13.52M and is therefore reviewed first.
 
 Four combinations follow directly from the two axes: high churn/high value gets a direct, urgent contact from the account owner; high churn/low value gets low-cost, capped-effort outreach; low churn/high value gets proactive relationship care rather than retention; low churn/low value is monitored, not actively worked.
 
@@ -77,7 +83,7 @@ The production layer extends this: model attribution ranks which of eight operat
 
 The decision lab's dossier computes the same business-rule evidence live from each customer's real 22-month synthetic series.
 
-A risk score is only a CRM-ready output once it is organized around the questions a retention team actually asks: who the customer is and who owns the relationship, what the model predicts, why the score is high, where the customer ranks once value and urgency are weighed, what to do next and with whom, and what happened after the queue was worked. Each reason bucket routes to a specific owner with its own priority and clock — delivery-quality reasons go to operations within 48 hours, complaints go to customer service within 24 hours, behavioral decline goes to the account owner within 5–7 business days, and an issue tied to a single depot, route or service point is handled as an incident rather than a per-customer case (Section 10).
+A risk score becomes CRM-ready through a typed, idempotent contract. `case_id` prevents duplicate upserts; `model_version` and `model_churn_probability` preserve the original decision; structured reason evidence, `priority_score`, `recommended_action`, `action_owner` and `action_deadline` drive the handoff; `action_status`, `outcome`, `outcome_detail` and `retained_after_horizon` close the loop. Each reason bucket routes to a specific owner with its own priority, clock and result code — delivery-quality reasons go to operations within 48 hours, complaints go to customer service within 24 hours, behavioral decline goes to the account owner within 5–7 business days, and an issue tied to a single depot, route or service point is handled as an incident rather than a per-customer case (Section 9).
 
 ## 9. Production, promotion, monitoring and overlay
 
@@ -87,38 +93,39 @@ A candidate variant is rejected when all walk-forward folds fail, the latest fol
 
 After scoring, the monitoring layer stores active count, risk count, risk ratio and score quantiles P50/P90/P99 by scoring origin; a high risk ratio is flagged against historical median plus three MAD. Feature drift uses PSI (`OK` ≤ 0.10, `WARN` > 0.10, `ALERT` > 0.20) and discrete KS.
 
-Monthly scoring is kept separate from retraining so it can run — or be adjusted — without ever touching the model. That separation is where an operational overlay belongs: a thin rule layer sitting after scoring that reads a live event (a delayed depot, a payment outage, a service disruption in one area), finds the customers active in that place and window, and raises their priority without ever changing the model's own probability. Every overlay carries a validity window and applies only to the customers actually affected, so it lapses automatically and never inflates the whole queue; its reason is logged separately from the model's own run log, so an audit can tell a model problem from an operational one at a glance. The output distinguishes `model_churn_probability` and `model_risk_level` (untouched by any overlay) from `overlay_flag`, `overlay_reason`, `overlay_severity`, `final_priority`, `recommended_action` and `action_deadline`.
+Monthly scoring is kept separate from retraining so it can run — or be adjusted — without ever touching the model. The operational overlay is a post-score rule layer that reads a live event (a delayed depot, a payment outage, a service disruption in one area), finds the customers active in that place and window, and raises their priority without ever changing the model's own probability. Matching uses place, service and validity window; the highest severity controls the deadline, priority may move at most two tiers, `event_id + case_id` is idempotent, and an operations owner can disable the rules without disabling scoring. Every overlay expires automatically and its reason is logged separately from the model run. The output distinguishes `model_churn_probability` and `model_risk_level` from `overlay_flag`, `overlay_reason`, `overlay_severity`, `final_priority`, `recommended_action` and `action_deadline`.
 
 ## 10. Review and approval before production
 
-Passing the model-performance gates above is necessary but not sufficient for a proof of concept to become something a business runs on. A release also has to prove data quality, feature alignment between training and scoring, threshold and segment stability, a correct output contract, a working CRM integration, and a full cycle of business review with no blocking feedback — with a confirmed path back to the previous accepted bundle if any of it needs to be reversed.
+Passing the model-performance gates above is necessary but not sufficient. The operating release blocks when data continuity falls below the configured floors, feature alignment differs from the saved bundle, rejected walk-forward folds exceed 25%, the final holdout is unavailable, required export fields are missing, duplicate `case_id` values exist, CRM upsert is not idempotent or business UAT records a severity-1 defect. Data Science and Business owners sign the release; the previous accepted bundle remains the rollback target.
 
 ## 11. Feedback loop
 
 Exporting a risk file is the start of a loop, not the end of the workflow: prediction routes to a business action, the action produces an actual outcome, the outcome is evaluated against the original prediction, and that evaluation feeds model improvement — which feeds the next prediction. Outcome data evaluates the policy; it does not relabel training data directly, which would let the act of contacting a customer quietly bias the model that decided to contact them.
 
-Five KPIs keep the loop honest: contact coverage (customers contacted ÷ customers flagged), action completion rate (cases closed within SLA ÷ cases opened), realized precision (confirmed at-risk ÷ total contacted), retention lift (churn rate of contacted customers versus a comparable, uncontacted group) and feedback completeness (rows with a recorded outcome ÷ rows exported).
+Six KPIs keep the loop honest: contact coverage, action completion rate, capture at capacity on labeled outcomes, retention lift (`control churn − action-group churn`), feedback completeness and net retention value (`protected margin − action cost`). Model quality and action effectiveness remain separate measurements because contact can change the outcome the model predicted.
 
-Retraining is already designed to respond to more than the calendar — a retrain is due early the moment feature drift crosses into alert territory, alongside the fixed quarterly cycle. The same principle extends to the loop: the operating threshold should be reviewed when realized precision, measured from actual outcomes, drifts down for several months in a row, and a reason bucket should be revisited when it consistently produces actions that don't change the outcome.
+One record moves through the full cycle: a 78%-risk customer with complaint escalation is routed to Customer Service within 24 hours; the complaint is closed, the account owner contacts the customer, and `retained_after_horizon` is recorded at `t + 2`. The result updates reason-level save propensity for the next EVR rank without directly relabeling the training row. Retraining also responds to numeric-feature PSI alerts alongside the quarterly cycle; threshold and reason-action rules are reviewed when capture or measured lift deteriorates across consecutive cycles.
+
+The showcase reports a transparent planning scenario per scoring cycle instead of an unaudited production claim: 7,000 available cases × 80% contact coverage, 18.0% control churn versus 14.2% action-group churn, ₫18.5M protected margin per retained account and ₫110K action cost per contact. The assumptions model +3.8 percentage-point lift, 213 retained accounts and ₫3.32B net retention value. Production reporting replaces each assumption with CRM and finance fields.
 
 ## 12. Ownership
 
-**Owned:** problem framing, label design, modeling, temporal validation, threshold strategy, explainability, output contract, the operating design (feature management, risk/value framework, overlay mechanism, review process and feedback loop), monitoring logic, production integration and the public notebook demo.
+**Owned:** problem framing, label design, modeling, temporal validation, threshold strategy, explainability, output contract, the operating workflow (feature management, risk/value framework, overlay mechanism, review process and feedback loop), monitoring logic, production integration and the public notebook demo.
 
 **Collaborated:** feature definitions and generation with data engineering.
 
-## 13. Roadmap and evidence required for the final portfolio update
+## 13. Delivery and evidence contract
 
-Before publishing production model or business claims, add only approved, reproducible evidence:
+Every operating run preserves six evidence groups:
 
-- approved production holdout period and sample size;
-- production ROC-AUC, PR-AUC and ranking metrics appropriate to class balance;
-- precision/recall or capture at the actual intervention capacity;
-- threshold and calibration evidence;
-- realized intervention volume;
-- a clearly defined business measurement window and comparison group;
-- contacted customers, retained customers and attributable revenue, if approved.
+- model evidence: temporal holdout, locked threshold, AP/F1/ROC-AUC and capture at capacity;
+- decision evidence: case ID, model version, original score, priority and reason evidence;
+- action evidence: owner, SLA, channel, contact timestamp, cost and resolution code;
+- outcome evidence: `retained_after_horizon` at `t + 2` with a comparison-group definition;
+- business evidence: protected margin and net value, reported separately from model quality;
+- audit evidence: overlay reason/expiry, approver and rollback target.
 
-Beyond evidence, a production-grade system adds: champion–challenger evaluation before a candidate ever sets a customer's priority; A/B or uplift measurement to isolate the action's true effect from the score; bias monitoring by region and segment; role-based access control separate from the underlying customer tables; a decision audit log; a response SLA alongside the existing data-freshness SLA; a cost/ROI framing measured against Expected Value of Retention; model performance and business performance reported as two separate numbers, never blended; and an explicit rollback command to the last accepted bundle. Human-in-the-loop is already a standing property of the design — no export field ever contacts a customer directly.
+Continuous-improvement controls include champion–challenger evaluation, A/B or uplift measurement, bias monitoring by region and segment, role-based access control, a decision audit log and a named rollback command. Human-in-the-loop remains a standing operating property — no export field contacts a customer automatically.
 
-Until the evidence above exists, the site labels production performance and business impact as pending, while the synthetic notebook run remains fully reproducible evidence of the method.
+The portfolio presents three inspectable layers: publicly reproduced notebook evidence, implementation traceable to system code, and the operational playbook used to turn scores into controlled retention work. Scenario economics are always labeled as assumptions rather than audited realized revenue.

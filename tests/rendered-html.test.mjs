@@ -34,14 +34,17 @@ test("renders the logistics churn showcase with real notebook outputs", async ()
   assert.match(html, /T0000955/);
   assert.match(html, /notebook_risk_list\.csv/);
   assert.match(html, /notebook_monthly_behavior\.csv/);
-  // Explainability honesty: gain importance in the demo, SHAP as production design
+  // Explainability and operating workflow
   assert.match(html, /XGBOOST GAIN/i);
   assert.match(html, /lifetime_avg_satisfaction/);
   assert.match(html, /SHAP evidence mapped to eight business reasons/i);
-  // Production design and monitoring layers stay clearly labeled
+  // Production workflow, monitoring and disclosed business scenario
   assert.match(html, /From notebook to production/i);
   assert.match(html, /Code-aligned model promotion/i);
   assert.match(html, /Logic reference · not a run result/i);
+  assert.match(html, /BUSINESS OUTCOME MODEL/i);
+  assert.match(html, /modeled net retention value/i);
+  assert.match(html, /CRM action &amp; feedback contract/i);
   // Static-export base path
   assert.match(html, /\/Showcase_Vnpost_churn_ver1\/case-study\//);
 });
@@ -57,7 +60,9 @@ test("renders the full recruiter-facing case study", async () => {
   assert.match(html, /SYNTHETIC HOLDOUT · REAL NOTEBOOK OUTPUT/);
   assert.match(html, /RISK VS\. VALUE/);
   assert.match(html, /Expected Value of Retention/);
+  assert.match(html, /DAY-TO-DAY PRIORITY RULE/);
   assert.match(html, /HIGH CHURN · HIGH VALUE/);
+  assert.match(html, /case_id/);
   assert.match(html, /From reason to response/i);
   assert.match(html, /PRODUCTION &amp; OVERLAY/);
   assert.match(html, /reacting to an incident without retraining/i);
@@ -66,7 +71,9 @@ test("renders the full recruiter-facing case study", async () => {
   assert.match(html, /REVIEW &amp; APPROVAL/);
   assert.match(html, /FEEDBACK LOOP/);
   assert.match(html, /Retention lift/);
-  assert.match(html, /Roadmap: what a production-grade system adds next/i);
+  assert.match(html, /BUSINESS OUTCOME MODEL/);
+  assert.match(html, /DELIVERY &amp; EVIDENCE/);
+  assert.match(html, /Continuous-improvement controls/i);
   assert.match(html, /NO FABRICATED METRICS/);
   assert.match(html, /Open decision lab/);
   assert.match(html, /notebook_risk_list\.csv/);
