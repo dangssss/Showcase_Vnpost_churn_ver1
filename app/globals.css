@@ -504,6 +504,7 @@ code { font-family: "JetBrains Mono", Consolas, "Courier New", monospace; font-s
 .impact-hero { border: 1px solid rgba(160, 255, 189, 0.42); background: rgba(160, 255, 189, 0.06); padding: 22px; margin-bottom: 12px; }
 .impact-hero strong { display: block; font-family: Georgia, serif; font-size: clamp(34px, 4vw, 48px); font-weight: 400; color: var(--mint); line-height: 1; }
 .impact-hero span { display: block; margin-top: 9px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #b9c6d2; }
+.confidential-impact strong { font-size: clamp(30px, 3.2vw, 42px); }
 .impact-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
 .impact-metrics div { border: 1px solid rgba(255, 255, 255, 0.16); padding: 12px 10px; }
 .impact-metrics b { display: block; color: white; font-size: 18px; font-variant-numeric: tabular-nums; }

@@ -115,21 +115,6 @@ const featureDrift = [
   { name: "service_types_used", label: "Service types used", values: [0.03, 0.03, 0.04, 0.05, 0.06, 0.08] },
 ];
 
-const impactScenario = {
-  queueCapacity: 7000,
-  contactCoverage: 0.8,
-  controlChurnRate: 0.18,
-  actionChurnRate: 0.142,
-  protectedMarginPerCustomer: 18_500_000,
-  actionCostPerContact: 110_000,
-};
-
-const impactContacts = Math.round(impactScenario.queueCapacity * impactScenario.contactCoverage);
-const impactLift = impactScenario.controlChurnRate - impactScenario.actionChurnRate;
-const modeledSaves = Math.round(impactContacts * impactLift);
-const modeledNetValue =
-  modeledSaves * impactScenario.protectedMarginPerCustomer - impactContacts * impactScenario.actionCostPerContact;
-
 function psiStatus(value: number) {
   if (value > 0.2) return "ALERT";
   if (value > 0.1) return "WARN";
@@ -508,8 +493,8 @@ export default function Home() {
         <strong>Portfolio-safe edition.</strong>
         <p>
           All customers are synthetic, generated with the production schema shapes. Metrics shown are real outputs of the
-          public notebook run. The operating workflow is code-aligned; business impact is shown separately as an explicit,
-          assumption-based planning scenario rather than an audited revenue claim.
+          public notebook run. The operating workflow is code-aligned; commercial outcome values are withheld, while the
+          measurement method and governance contract remain inspectable.
         </p>
         <span>NO PRODUCTION DATA</span>
       </aside>
@@ -1554,25 +1539,24 @@ export default function Home() {
           </article>
 
           <article className="impact-card">
-            <span className="card-kicker">BUSINESS OUTCOME MODEL</span>
-            <h3>Impact scenario per scoring cycle</h3>
-            <div className="impact-hero">
-              <strong>₫{(modeledNetValue / 1_000_000_000).toFixed(2)}B</strong>
-              <span>modeled net retention value</span>
+            <span className="card-kicker">BUSINESS OUTCOME GOVERNANCE</span>
+            <h3>Commercial impact measurement</h3>
+            <div className="impact-hero confidential-impact">
+              <strong>Confidential</strong>
+              <span>commercial metrics withheld</span>
             </div>
             <div className="impact-metrics">
-              <div><b>{pct(impactScenario.contactCoverage, 0)}</b><span>contact coverage</span></div>
-              <div><b>+{(impactLift * 100).toFixed(1)} pp</b><span>retention lift</span></div>
-              <div><b>{fmt(modeledSaves)}</b><span>modeled saves</span></div>
+              <div><b>Coverage</b><span>contacted ÷ flagged</span></div>
+              <div><b>Lift</b><span>control churn − action churn</span></div>
+              <div><b>Net value</b><span>protected margin − action cost</span></div>
             </div>
             <p>
-              Planning scenario: {fmt(impactScenario.queueCapacity)} available cases × {pct(impactScenario.contactCoverage, 0)} contacted;
-              control churn {pct(impactScenario.controlChurnRate)} vs. action-group churn {pct(impactScenario.actionChurnRate)};
-              ₫{(impactScenario.protectedMarginPerCustomer / 1_000_000).toFixed(1)}M protected margin per retained account and
-              ₫{fmt(impactScenario.actionCostPerContact)} action cost per contact.
+              The operating loop records intervention reach, action completion, retention lift, retained accounts and net
+              retention value after the two-month outcome window. Business results are treated as commercially sensitive;
+              the portfolio exposes how they are measured, not the underlying customer or financial values.
             </p>
             <small className="impact-disclaimer">
-              Scenario model, not an audited production revenue claim. Actual lift is measured as control churn minus action-group churn.
+              Method disclosed · customer counts, realized lift, retained accounts, margin and revenue withheld.
             </small>
           </article>
         </div>

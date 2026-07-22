@@ -42,8 +42,8 @@ test("renders the logistics churn showcase with real notebook outputs", async ()
   assert.match(html, /From notebook to production/i);
   assert.match(html, /Code-aligned model promotion/i);
   assert.match(html, /Logic reference · not a run result/i);
-  assert.match(html, /BUSINESS OUTCOME MODEL/i);
-  assert.match(html, /modeled net retention value/i);
+  assert.match(html, /BUSINESS OUTCOME GOVERNANCE/i);
+  assert.match(html, /commercial metrics withheld/i);
   assert.match(html, /CRM action &amp; feedback contract/i);
   // Static-export base path
   assert.match(html, /\/Showcase_Vnpost_churn_ver1\/case-study\//);
@@ -71,7 +71,8 @@ test("renders the full recruiter-facing case study", async () => {
   assert.match(html, /REVIEW &amp; APPROVAL/);
   assert.match(html, /FEEDBACK LOOP/);
   assert.match(html, /Retention lift/);
-  assert.match(html, /BUSINESS OUTCOME MODEL/);
+  assert.match(html, /BUSINESS OUTCOME GOVERNANCE/);
+  assert.match(html, /Commercial results are confidential/i);
   assert.match(html, /DELIVERY &amp; EVIDENCE/);
   assert.match(html, /Continuous-improvement controls/i);
   assert.match(html, /NO FABRICATED METRICS/);

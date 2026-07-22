@@ -107,7 +107,7 @@ Six KPIs keep the loop honest: contact coverage, action completion rate, capture
 
 One record moves through the full cycle: a 78%-risk customer with complaint escalation is routed to Customer Service within 24 hours; the complaint is closed, the account owner contacts the customer, and `retained_after_horizon` is recorded at `t + 2`. The result updates reason-level save propensity for the next EVR rank without directly relabeling the training row. Retraining also responds to numeric-feature PSI alerts alongside the quarterly cycle; threshold and reason-action rules are reviewed when capture or measured lift deteriorates across consecutive cycles.
 
-The showcase reports a transparent planning scenario per scoring cycle instead of an unaudited production claim: 7,000 available cases × 80% contact coverage, 18.0% control churn versus 14.2% action-group churn, ₫18.5M protected margin per retained account and ₫110K action cost per contact. The assumptions model +3.8 percentage-point lift, 213 retained accounts and ₫3.32B net retention value. Production reporting replaces each assumption with CRM and finance fields.
+Commercial outcome figures are treated as confidential. The case study therefore publishes the measurement contract rather than customer or financial values: each cycle reports contact coverage, SLA completion, retention lift (`control churn − action-group churn`), retained accounts, protected margin, action cost and net retention value (`protected margin − action cost`).
 
 ## 12. Ownership
 
@@ -128,4 +128,4 @@ Every operating run preserves six evidence groups:
 
 Continuous-improvement controls include champion–challenger evaluation, A/B or uplift measurement, bias monitoring by region and segment, role-based access control, a decision audit log and a named rollback command. Human-in-the-loop remains a standing operating property — no export field contacts a customer automatically.
 
-The portfolio presents three inspectable layers: publicly reproduced notebook evidence, implementation traceable to system code, and the operational playbook used to turn scores into controlled retention work. Scenario economics are always labeled as assumptions rather than audited realized revenue.
+The portfolio presents three inspectable layers: publicly reproduced notebook evidence, implementation traceable to system code, and the operational playbook used to turn scores into controlled retention work. Commercial customer counts, realized lift, retained-account totals, margin and revenue remain withheld.

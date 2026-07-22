@@ -79,7 +79,7 @@ const feedbackKpis = [
   ["Capture at capacity", "Actual churners in top-N ÷ all actual churners", "Model quality at the intervention capacity, evaluated on labeled outcomes"],
   ["Retention lift", "Churn rate (control) − churn rate (action group)", "Positive lift means the action group churned less than its comparison group"],
   ["Feedback completeness", "Rows with a recorded outcome ÷ rows exported", "Whether the loop itself is being closed"],
-  ["Net retention value", "Modeled protected margin − action cost", "Business value reported separately from F1 and AP"],
+  ["Net retention value", "Protected margin − action cost", "Business value reported separately from F1 and AP"],
 ];
 
 const roadmapItems = [
@@ -163,7 +163,7 @@ export default function CaseStudy() {
           </dl>
           <p>
             Demo metrics are reproducible notebook outputs on synthetic data. Production-system claims are tied to code;
-            business impact is presented as an explicit operating scenario with visible assumptions.
+            commercial outcome figures are withheld while the measurement method remains fully documented.
           </p>
         </aside>
       </section>
@@ -899,14 +899,13 @@ export default function CaseStudy() {
               </table>
             </div>
             <div className="direct-answer business-scenario-case">
-              <span>BUSINESS OUTCOME MODEL · PER SCORING CYCLE</span>
-              <strong>₫3.32B modeled net retention value</strong>
+              <span>BUSINESS OUTCOME GOVERNANCE</span>
+              <strong>Commercial results are confidential; the measurement contract is not</strong>
               <p>
-                Planning assumptions: 7,000 available cases, 80% contact coverage, 18.0% control churn versus 14.2%
-                action-group churn, ₫18.5M protected margin per retained account and ₫110K action cost per contact. The
-                resulting +3.8 percentage-point lift models 213 retained accounts. This is an operating scenario — actual
-                business reporting replaces each assumption with CRM outcome and finance fields, without presenting the
-                scenario as audited revenue.
+                Each scoring cycle reports contact coverage, SLA completion, retention lift, retained accounts, protected
+                margin, action cost and net retention value. Lift is calculated as control churn minus action-group churn;
+                net value is protected margin minus action cost. Customer counts, realized lift and financial values are
+                intentionally withheld as commercially sensitive information.
               </p>
             </div>
             <p>
@@ -944,7 +943,7 @@ export default function CaseStudy() {
               <div>
                 <span>OPERATIONALIZED PLAYBOOK</span>
                 <strong>Retention action and measurement</strong>
-                <p>Typed CRM contract, risk/value priority, owner/SLA routing, incident overlay, outcome loop and a transparent business-impact scenario.</p>
+                <p>Typed CRM contract, risk/value priority, owner/SLA routing, incident overlay, outcome loop and confidential business-impact governance.</p>
               </div>
             </div>
             <div className="evidence-needed">
